@@ -7,7 +7,7 @@ const HISTORY_KEY = 'lucky_bingo_history';
 // Get Telegram user data if available
 export function getTelegramUser() {
   if (typeof window !== 'undefined') {
-    const tg = (window as unknown as { Telegram?: { WebApp?: { initDataUnsafe?: { user?: { id: number; username?: string; first_name?: string } } } } }).Telegram?.WebApp;
+    const tg = (window as any).Telegram?.WebApp;
     if (tg?.initDataUnsafe?.user) {
       return tg.initDataUnsafe.user;
     }
@@ -34,6 +34,9 @@ export function getStoredPlayer(): Player {
         playerObj.first_name = tgUser.first_name || playerObj.first_name;
         playerObj.telegram_id = tgUser.id;
         playerObj.id = tgUser.id.toString();
+        if (tgUser.photo_url) {
+          playerObj.photo_url = tgUser.photo_url;
+        }
       }
     } catch (e) {
       playerObj = {
@@ -44,6 +47,7 @@ export function getStoredPlayer(): Player {
         mainWallet: 200,
         playWallet: 50,
         created_at: new Date().toISOString(),
+        photo_url: tgUser?.photo_url || '',
       };
     }
   } else {
@@ -55,6 +59,7 @@ export function getStoredPlayer(): Player {
       mainWallet: 200,
       playWallet: 50,
       created_at: new Date().toISOString(),
+      photo_url: tgUser?.photo_url || '',
     };
   }
 
@@ -69,6 +74,8 @@ export function getStoredPlayer(): Player {
         telegramId: playerObj.id,
         name: playerObj.first_name,
         username: playerObj.username,
+        phoneNumber: playerObj.phone_number,
+        photoUrl: playerObj.photo_url,
       }),
     }).catch(() => {});
   } catch (e) {}
@@ -254,6 +261,8 @@ export async function syncPlayerProfile(playerId: string): Promise<Player | null
       const synced: Player = {
         ...local,
         mainWallet: data.user.balance !== undefined ? data.user.balance : local.mainWallet,
+        phone_number: data.user.phoneNumber !== undefined ? data.user.phoneNumber : local.phone_number,
+        photo_url: data.user.photoUrl !== undefined ? data.user.photoUrl : local.photo_url,
       };
       savePlayer(synced);
       return synced;

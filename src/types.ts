@@ -10,6 +10,8 @@ export interface Player {
   mainWallet: number;
   playWallet: number;
   created_at: string;
+  photo_url?: string;
+  phone_number?: string;
 }
 
 export interface CartelCell {

@@ -109,11 +109,11 @@ app.get('/api/users', async (_req, res) => {
 
 app.post('/api/users', async (req, res) => {
   try {
-    const { telegramId, name, username } = req.body;
+    const { telegramId, name, username, phoneNumber, photoUrl } = req.body;
     if (!telegramId || !name) {
       return res.status(400).json({ success: false, error: 'telegramId and name are required' });
     }
-    const user = await findOrCreateUser(telegramId, name, username);
+    const user = await findOrCreateUser(telegramId, name, username, phoneNumber, photoUrl);
     res.json({ success: true, user });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Failed to save user' });

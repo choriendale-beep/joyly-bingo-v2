@@ -214,13 +214,13 @@ export const PageAdmin: React.FC = () => {
           src={user.photoUrl}
           referrerPolicy="no-referrer"
           alt={user.name}
-          className="w-10 h-10 rounded-full object-cover border border-slate-700"
+          className="w-10 h-10 rounded-full object-cover border border-sky-800/80"
         />
       );
     }
     const initials = user.name.slice(0, 2).toUpperCase();
     return (
-      <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-amber-400">
+      <div className="w-10 h-10 rounded-full bg-sky-950/50 border border-sky-800/60 flex items-center justify-center text-xs font-bold text-sky-400 shadow-inner">
         {initials || 'TG'}
       </div>
     );
@@ -228,21 +228,21 @@ export const PageAdmin: React.FC = () => {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-[#0b0e17] flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-[#121624] border border-slate-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+      <div className="min-h-screen bg-[#070b19] flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-[#0f142c] border border-sky-900/40 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
           {/* Decorative glows */}
-          <div className="absolute -top-10 -left-10 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
-          <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute -top-10 -left-10 w-40 h-40 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
           <div className="flex flex-col items-center text-center relative z-10">
-            <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
+            <div className="w-16 h-16 bg-sky-500/10 border border-sky-500/20 text-sky-400 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
               <Lock className="w-8 h-8" />
             </div>
             
-            <h1 className="text-xl font-black tracking-tight text-white mb-2 uppercase">
-              👑 LUCKY BINGO ADMIN
+            <h1 className="text-xl font-black tracking-tight text-white mb-2 uppercase flex items-center gap-1.5">
+              👑 LUCKY BINGO <span className="text-sky-400">ADMIN</span>
             </h1>
-            <p className="text-xs text-slate-400 mb-6 max-w-xs">
+            <p className="text-xs text-slate-400 mb-6 max-w-xs leading-relaxed">
               ይህ የአስተዳዳሪ ፖርታል (Admin Portal) ነው። ለመግባት እባክዎ የአስተዳዳሪውን ሚስጥራዊ ቁልፍ (PIN/Password) ያስገቡ።
             </p>
 
@@ -256,7 +256,7 @@ export const PageAdmin: React.FC = () => {
                   value={pinInput}
                   onChange={(e) => setPinInput(e.target.value)}
                   placeholder="የይለፍ ቃል ያስገቡ..."
-                  className="w-full bg-[#0b0e17] border border-slate-800 hover:border-slate-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 outline-none transition-all text-center tracking-widest font-mono font-bold"
+                  className="w-full bg-[#070b19] border border-sky-950 hover:border-sky-900 focus:border-sky-500 focus:ring-1 focus:ring-sky-500/30 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 outline-none transition-all text-center tracking-widest font-mono font-bold"
                   autoFocus
                 />
               </div>
@@ -270,17 +270,17 @@ export const PageAdmin: React.FC = () => {
 
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold py-3 px-4 rounded-xl shadow-lg shadow-amber-500/10 active:scale-[0.98] transition cursor-pointer flex items-center justify-center gap-2 text-sm"
+                className="w-full bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-400 hover:to-sky-500 text-slate-950 font-black py-3 px-4 rounded-xl shadow-lg shadow-sky-500/10 active:scale-[0.98] transition cursor-pointer flex items-center justify-center gap-2 text-sm"
               >
                 <Shield className="w-4 h-4 text-slate-950 stroke-[2.5]" />
                 በደህንነት ግባ (Login Securely)
               </button>
             </form>
 
-            <div className="mt-8 border-t border-slate-800/80 pt-4 w-full text-center">
+            <div className="mt-8 border-t border-sky-950/80 pt-4 w-full text-center">
               <a
                 href="/"
-                className="text-xs text-slate-500 hover:text-slate-300 transition flex items-center justify-center gap-1.5"
+                className="text-xs text-slate-400 hover:text-sky-400 transition flex items-center justify-center gap-1.5"
               >
                 ← ወደ ተጫዋች መተግበሪያ ተመለስ (Back to Game)
               </a>
@@ -292,7 +292,7 @@ export const PageAdmin: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col font-sans pb-24 relative select-none">
+    <div className="min-h-screen bg-[#070b19] text-slate-100 flex flex-col font-sans pb-24 relative select-none">
       
       {/* Dynamic Toast / Status Alert banner */}
       {infoMessage && (
@@ -309,18 +309,18 @@ export const PageAdmin: React.FC = () => {
       )}
 
       {/* TOP HEADER BAR */}
-      <header className="bg-[#121727] border-b border-slate-800/80 sticky top-0 z-40 px-4 py-3.5 flex items-center justify-between">
+      <header className="bg-[#0f142c] border-b border-sky-950 sticky top-0 z-40 px-4 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setDrawerOpen(true)}
-            className="text-slate-300 hover:text-white p-1 rounded-xl bg-slate-800/60 border border-slate-700/60 active:scale-95 transition cursor-pointer"
+            className="text-slate-300 hover:text-white p-1 rounded-xl bg-sky-950/60 border border-sky-900/40 active:scale-95 transition cursor-pointer"
           >
             <Menu className="w-5 h-5" />
           </button>
           <div>
             <h1 className="text-sm font-extrabold tracking-tight text-white flex items-center gap-1.5">
               <span>👑 LUCKY BINGO</span>
-              <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-md font-mono">ADMIN</span>
+              <span className="text-[10px] bg-sky-500/20 text-sky-400 px-1.5 py-0.5 rounded-md font-mono font-bold">አስተዳዳሪ (ADMIN)</span>
             </h1>
             <p className="text-[10px] text-slate-400">Live Management Dashboard</p>
           </div>
@@ -329,7 +329,7 @@ export const PageAdmin: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             onClick={loadData}
-            className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700/80 text-amber-400 px-2.5 py-1.5 rounded-xl transition font-medium cursor-pointer active:scale-95"
+            className="text-xs bg-sky-950/40 hover:bg-sky-950 border border-sky-900/40 text-sky-400 px-2.5 py-1.5 rounded-xl transition font-medium cursor-pointer active:scale-95"
           >
             🔄 Refresh
           </button>
@@ -338,26 +338,26 @@ export const PageAdmin: React.FC = () => {
 
       {/* NAVIGATION DRAWER (Sliding Menu) */}
       {drawerOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex">
-          <div className="w-72 bg-[#101426] border-r border-slate-800/80 h-full p-5 flex flex-col justify-between relative shadow-2xl">
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex animate-fade-in">
+          <div className="w-72 bg-[#0e132b] border-r border-sky-950 h-full p-5 flex flex-col justify-between relative shadow-2xl">
             <div>
               {/* Close Drawer Button */}
               <button
                 onClick={() => setDrawerOpen(false)}
-                className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-full bg-slate-800 cursor-pointer"
+                className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-full bg-sky-950 hover:bg-sky-900 border border-sky-900/40 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
 
               <div className="mt-4 mb-8">
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-gradient-to-tr from-amber-500 to-amber-400 rounded-2xl flex items-center justify-center font-bold text-slate-950 shadow-md">
+                  <div className="w-10 h-10 bg-gradient-to-tr from-sky-500 to-blue-600 rounded-2xl flex items-center justify-center font-bold text-white shadow-lg">
                     👑
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold text-white">Main Administrator</h2>
-                    <p className="text-[10px] text-emerald-400 flex items-center gap-1 font-mono">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
+                    <h2 className="text-sm font-bold text-white">የሲስተም አስተዳዳሪ</h2>
+                    <p className="text-[10px] text-sky-400 flex items-center gap-1 font-mono font-bold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-sky-400 inline-block animate-pulse"></span>
                       Verified Session
                     </p>
                   </div>
@@ -367,11 +367,11 @@ export const PageAdmin: React.FC = () => {
               {/* Menu Options */}
               <div className="space-y-1.5">
                 {[
-                  { id: 'OVERVIEW', label: 'Home Overview', icon: LayoutDashboard },
-                  { id: 'DEPOSITS', label: 'Pending Deposits', icon: Coins, count: pendingDeposits.length },
-                  { id: 'WITHDRAWALS', label: 'Pending Withdrawals', icon: ArrowUpRight, count: pendingWithdrawals.length },
-                  { id: 'PLAYERS', label: 'Player Management', icon: Users, count: users.length },
-                  { id: 'SETTINGS', label: 'Settings', icon: SettingsIcon },
+                  { id: 'OVERVIEW', label: 'Home Overview (ዋና ገጽ)', icon: LayoutDashboard },
+                  { id: 'DEPOSITS', label: 'Pending Deposits (ዴፖዚቶች)', icon: Coins, count: pendingDeposits.length },
+                  { id: 'WITHDRAWALS', label: 'Pending Withdrawals (ወጪዎች)', icon: ArrowUpRight, count: pendingWithdrawals.length },
+                  { id: 'PLAYERS', label: 'Player Management (ተጫዋቾች)', icon: Users, count: users.length },
+                  { id: 'SETTINGS', label: 'Settings (ቅንብሮች)', icon: SettingsIcon },
                 ].map((item) => {
                   const Icon = item.icon;
                   const isSel = activeSection === item.id;
@@ -384,8 +384,8 @@ export const PageAdmin: React.FC = () => {
                       }}
                       className={`w-full flex items-center justify-between p-3 rounded-2xl transition cursor-pointer ${
                         isSel
-                          ? 'bg-amber-500 text-slate-950 font-bold shadow-md'
-                          : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                          ? 'bg-sky-500 text-slate-950 font-black shadow-md shadow-sky-500/10'
+                          : 'text-slate-300 hover:bg-sky-950/50 hover:text-white'
                       }`}
                     >
                       <div className="flex items-center gap-3 text-xs">
@@ -393,8 +393,8 @@ export const PageAdmin: React.FC = () => {
                         <span>{item.label}</span>
                       </div>
                       {item.count !== undefined && item.count > 0 && (
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
-                          isSel ? 'bg-slate-950 text-amber-400' : 'bg-amber-500/20 text-amber-400'
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+                          isSel ? 'bg-slate-950 text-sky-400' : 'bg-sky-500/20 text-sky-400'
                         }`}>
                           {item.count}
                         </span>
@@ -405,7 +405,7 @@ export const PageAdmin: React.FC = () => {
               </div>
             </div>
 
-            <div className="border-t border-slate-800/80 pt-4 space-y-2 text-center">
+            <div className="border-t border-sky-950 pt-4 space-y-2 text-center">
               <button
                 onClick={handleLogout}
                 className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/25 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer"
@@ -428,11 +428,11 @@ export const PageAdmin: React.FC = () => {
         {activeSection === 'OVERVIEW' && (
           <div className="space-y-5 animate-fade-in">
             {/* Quick Greeting */}
-            <div className="bg-gradient-to-r from-amber-500/10 to-amber-600/5 border border-amber-500/20 rounded-3xl p-4 flex items-center justify-between shadow-md">
+            <div className="bg-gradient-to-r from-sky-500/10 to-blue-600/5 border border-sky-500/20 rounded-3xl p-4 flex items-center justify-between shadow-md">
               <div className="space-y-1">
                 <h2 className="text-sm font-bold text-white flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-amber-400" />
-                  መልካም የስራ ጊዜ!
+                  <Sparkles className="w-4 h-4 text-sky-400" />
+                  መልካም የስራ ጊዜ! (Have a great workday!)
                 </h2>
                 <p className="text-xs text-slate-400">Manage real-time players, CBE and Telebirr receipts easily.</p>
               </div>
@@ -441,34 +441,34 @@ export const PageAdmin: React.FC = () => {
             {/* ANALYTICAL METRICS GRID */}
             <div className="grid grid-cols-3 gap-2.5">
               {/* Metric 1 */}
-              <div className="bg-[#121624] border border-slate-800 rounded-2xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden">
+              <div className="bg-[#0f142c] border border-sky-950/60 rounded-2xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden">
                 <div className="text-slate-500 mb-1.5">
                   <Users className="w-4 h-4 text-sky-400" />
                 </div>
                 <div>
-                  <div className="text-xs text-slate-400 leading-none">Total Users</div>
+                  <div className="text-[10px] text-slate-400 leading-none font-bold">Total Users</div>
                   <div className="text-lg font-black text-white mt-1 font-mono">{totalUsers}</div>
                 </div>
               </div>
 
               {/* Metric 2 */}
-              <div className="bg-[#121624] border border-slate-800 rounded-2xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden">
+              <div className="bg-[#0f142c] border border-sky-950/60 rounded-2xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden">
                 <div className="text-slate-500 mb-1.5">
                   <Coins className="w-4 h-4 text-emerald-400" />
                 </div>
                 <div>
-                  <div className="text-xs text-slate-400 leading-none">24h Deposits</div>
+                  <div className="text-[10px] text-slate-400 leading-none font-bold">24h Deposits</div>
                   <div className="text-sm font-black text-emerald-400 mt-1 font-mono">{approvedDeposits24h} ETB</div>
                 </div>
               </div>
 
               {/* Metric 3 */}
-              <div className="bg-[#121624] border border-slate-800 rounded-2xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden">
+              <div className="bg-[#0f142c] border border-sky-950/60 rounded-2xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden">
                 <div className="text-slate-500 mb-1.5">
                   <ArrowUpRight className="w-4 h-4 text-rose-400" />
                 </div>
                 <div>
-                  <div className="text-xs text-slate-400 leading-none">Pending Cashout</div>
+                  <div className="text-[10px] text-slate-400 leading-none font-bold">Pending Cashout</div>
                   <div className="flex items-center gap-1 mt-1">
                     <span className="text-lg font-black text-white font-mono">{pendingWithdrawals.length}</span>
                     {pendingWithdrawals.length > 0 && (
@@ -480,16 +480,16 @@ export const PageAdmin: React.FC = () => {
             </div>
 
             {/* ACTION CENTER - REDIRECT CARDS */}
-            <div className="bg-[#121624] border border-slate-800/80 rounded-3xl p-4 space-y-3 shadow-md">
-              <h3 className="text-xs font-bold text-slate-300 tracking-wide uppercase border-b border-slate-800 pb-2">Quick Navigation</h3>
+            <div className="bg-[#0f142c] border border-sky-950/60 rounded-3xl p-4 space-y-3 shadow-md">
+              <h3 className="text-xs font-bold text-slate-300 tracking-wide uppercase border-b border-sky-950/50 pb-2">Quick Navigation (ፈጣን አቋራጭ)</h3>
               
               <div className="space-y-2">
                 <button
                   onClick={() => setActiveSection('DEPOSITS')}
-                  className="w-full bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 rounded-2xl p-3 flex items-center justify-between text-left transition cursor-pointer"
+                  className="w-full bg-sky-950/20 hover:bg-sky-950/60 border border-sky-900/40 rounded-2xl p-3 flex items-center justify-between text-left transition cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+                    <div className="p-2 rounded-xl bg-sky-500/10 text-sky-400">
                       <Coins className="w-4 h-4" />
                     </div>
                     <div>
@@ -502,7 +502,7 @@ export const PageAdmin: React.FC = () => {
 
                 <button
                   onClick={() => setActiveSection('WITHDRAWALS')}
-                  className="w-full bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 rounded-2xl p-3 flex items-center justify-between text-left transition cursor-pointer"
+                  className="w-full bg-sky-950/20 hover:bg-sky-950/60 border border-sky-900/40 rounded-2xl p-3 flex items-center justify-between text-left transition cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400">
@@ -518,7 +518,7 @@ export const PageAdmin: React.FC = () => {
 
                 <button
                   onClick={() => setActiveSection('PLAYERS')}
-                  className="w-full bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 rounded-2xl p-3 flex items-center justify-between text-left transition cursor-pointer"
+                  className="w-full bg-sky-950/20 hover:bg-sky-950/60 border border-sky-900/40 rounded-2xl p-3 flex items-center justify-between text-left transition cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-xl bg-sky-500/10 text-sky-400">
@@ -755,7 +755,10 @@ export const PageAdmin: React.FC = () => {
         {activeSection === 'PLAYERS' && (
           <div className="space-y-4 animate-fade-in">
             <div>
-              <h2 className="text-sm font-bold text-white">Player Database</h2>
+              <h2 className="text-sm font-bold text-white flex items-center gap-1.5">
+                <span>👥 Player Database</span>
+                <span className="text-[10px] bg-sky-500/10 text-sky-400 px-1.5 py-0.5 rounded-md font-bold">ተጫዋቾች</span>
+              </h2>
               <p className="text-[10px] text-slate-400">Search players, adjust balance, ban or unban accounts</p>
             </div>
 
@@ -764,68 +767,83 @@ export const PageAdmin: React.FC = () => {
               <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
               <input
                 type="text"
-                placeholder="Search by name, @username, or Telegram ID..."
+                placeholder="ስም፣ ዩዘርኔም ወይም ቴሌግራም ID መፈለጊያ..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#121624] border border-slate-800 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                className="w-full bg-[#0f142c] border border-sky-950 hover:border-sky-900 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 transition-all"
               />
             </div>
 
-            <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
+            <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
               {filteredUsers.length === 0 ? (
-                <div className="text-center py-10 text-slate-500 text-xs bg-[#121624] border border-slate-800 rounded-3xl">
-                  No matching players found.
+                <div className="text-center py-10 text-slate-500 text-xs bg-[#0f142c] border border-sky-950 rounded-3xl">
+                  ተጫዋች አልተገኘም (No matching players found).
                 </div>
               ) : (
                 filteredUsers.map((user) => (
                   <div
                     key={user.telegramId}
-                    className={`bg-[#121624] border rounded-3xl p-4 space-y-3.5 shadow-sm transition ${
-                      user.isBanned ? 'border-rose-950/60 bg-slate-950/20' : 'border-slate-800/80'
+                    className={`bg-[#0f142c] border rounded-3xl p-4 space-y-4 shadow-lg transition-all hover:border-sky-500/30 ${
+                      user.isBanned ? 'border-rose-950/60 bg-slate-950/20' : 'border-sky-950/60'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
+                    <div className="flex items-start justify-between gap-2.5">
+                      <div className="flex items-center gap-3">
                         {renderAvatar(user)}
                         <div>
-                          <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                          <div className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
                             <span>{user.name}</span>
-                            {user.isBanned && (
-                              <span className="text-[8px] font-extrabold bg-rose-500/10 text-rose-400 border border-rose-500/20 px-1 py-0.2 rounded uppercase">
-                                Banned
+                            {user.isBanned ? (
+                              <span className="text-[8px] font-extrabold bg-rose-500/15 text-rose-400 border border-rose-500/20 px-1.5 py-0.5 rounded-md uppercase">
+                                የታገደ (Banned)
+                              </span>
+                            ) : (
+                              <span className="text-[8px] font-extrabold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded-md uppercase">
+                                Active
                               </span>
                             )}
                           </div>
-                          <div className="text-[10px] text-slate-400 font-mono">
-                            @{user.username || 'No username'} • ID: {user.telegramId}
+                          <div className="text-[10px] text-slate-400 font-mono mt-1 space-y-0.5">
+                            <div>🆔 Telegram ID: <span className="text-slate-300 font-bold">{user.telegramId}</span></div>
+                            <div>👤 Username: <span className="text-sky-400">@{user.username || 'No username'}</span></div>
                           </div>
                         </div>
                       </div>
 
-                      <div className="text-right">
-                        <span className="text-[10px] text-slate-500 block">Balance</span>
-                        <span className="text-sm font-black text-amber-400 font-mono">
+                      <div className="text-right bg-sky-950/30 border border-sky-900/30 px-3 py-1.5 rounded-2xl shrink-0">
+                        <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider">የአሁኑ ሂሳብ</span>
+                        <span className="text-xs font-black text-sky-400 font-mono block mt-0.5">
                           {user.balance} ETB
                         </span>
                       </div>
                     </div>
 
-                    <div className="bg-slate-900/40 border border-slate-850/60 rounded-2xl px-3 py-2 text-[10px] text-slate-400 flex items-center justify-between">
-                      <div>Games Played: <span className="text-white font-bold font-mono">{user.gamesPlayed || 0}</span></div>
-                      <div>Wins: <span className="text-emerald-400 font-bold font-mono">{user.gamesWon || 0}</span></div>
-                      <div>Total Won: <span className="text-amber-400 font-bold font-mono">{user.totalEarnings || 0} ETB</span></div>
+                    {/* Phone Number Display */}
+                    <div className="bg-[#151c3a] border border-sky-950/60 rounded-2xl px-4 py-3 flex items-center justify-between text-xs text-slate-300">
+                      <span className="text-slate-400 flex items-center gap-1.5 font-bold">
+                        📱 ስልክ ቁጥር (Phone):
+                      </span>
+                      <span className="font-mono font-black text-white bg-[#0e122b] px-3 py-1 rounded-xl border border-sky-900/40 shadow-inner text-xs">
+                        {user.phoneNumber || 'Not Shared (ስልክ አላጋራም)'}
+                      </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-[#121630]/50 border border-sky-950/30 rounded-2xl px-3 py-2 text-[10px] text-slate-400 flex items-center justify-between">
+                      <div>ጨዋታዎች: <span className="text-white font-bold font-mono">{user.gamesPlayed || 0}</span></div>
+                      <div>ድሎች: <span className="text-emerald-400 font-bold font-mono">{user.gamesWon || 0}</span></div>
+                      <div>ጠቅላላ ያሸነፉት: <span className="text-sky-400 font-bold font-mono">{user.totalEarnings || 0} ETB</span></div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-1">
                       <button
                         onClick={() => {
                           setEditingBalanceUser(user);
                           setNewBalance(String(user.balance));
                         }}
-                        className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/80 font-bold py-2 rounded-xl text-[10px] transition flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                        className="bg-[#151c3a] hover:bg-[#1a234a] text-sky-300 border border-sky-900/40 font-bold py-2 rounded-xl text-[10px] transition flex items-center justify-center gap-1 cursor-pointer active:scale-95"
                       >
-                        <Edit2 className="w-3 h-3 text-amber-400" />
-                        <span>Adjust Balance</span>
+                        <Edit2 className="w-3 h-3 text-sky-400" />
+                        <span>ሂሳብ ማስተካከያ (Adjust Balance)</span>
                       </button>
 
                       {user.isBanned ? (
@@ -834,7 +852,7 @@ export const PageAdmin: React.FC = () => {
                           className="bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/20 text-emerald-400 font-bold py-2 rounded-xl text-[10px] transition flex items-center justify-center gap-1 cursor-pointer"
                         >
                           <Shield className="w-3 h-3" />
-                          <span>UNBAN PLAYER</span>
+                          <span>እገዳ አንሳ (UNBAN)</span>
                         </button>
                       ) : (
                         <button
@@ -842,7 +860,7 @@ export const PageAdmin: React.FC = () => {
                           className="bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/20 text-rose-400 font-bold py-2 rounded-xl text-[10px] transition flex items-center justify-center gap-1 cursor-pointer"
                         >
                           <ShieldAlert className="w-3 h-3" />
-                          <span>BAN PLAYER</span>
+                          <span>አግድ (BAN PLAYER)</span>
                         </button>
                       )}
                     </div>

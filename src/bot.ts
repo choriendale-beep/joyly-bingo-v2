@@ -45,8 +45,21 @@ function setupBotHandlers(bot: Telegraf) {
     const name = (firstName + ' ' + lastName).trim() || 'Telegram Player';
     const username = ctx.from?.username || '';
 
+    // Fetch user profile photo if available
+    let photoUrl = '';
+    try {
+      const photos = await ctx.telegram.getUserProfilePhotos(ctx.from.id, 0, 1);
+      if (photos && photos.total_count > 0 && photos.photos[0] && photos.photos[0][0]) {
+        const fileId = photos.photos[0][0].file_id;
+        const fileLink = await ctx.telegram.getFileLink(fileId);
+        photoUrl = fileLink.href || String(fileLink);
+      }
+    } catch (e) {
+      console.warn('[Telegram Bot] Photo fetch failed:', e);
+    }
+
     // Automatically register or update the player's name & username on MongoDB Atlas
-    const user = await findOrCreateUser(telegramId, name, username);
+    const user = await findOrCreateUser(telegramId, name, username, undefined, photoUrl);
 
     const webAppUrl = process.env.TELEGRAM_WEBAPP_URL || 'https://joyly-bingo-v2.onrender.com';
 
@@ -98,8 +111,21 @@ function setupBotHandlers(bot: Telegraf) {
     const username = ctx.from?.username;
     const phoneNumber = contact.phone_number;
 
+    // Fetch user profile photo if available
+    let photoUrl = '';
+    try {
+      const photos = await ctx.telegram.getUserProfilePhotos(ctx.from.id, 0, 1);
+      if (photos && photos.total_count > 0 && photos.photos[0] && photos.photos[0][0]) {
+        const fileId = photos.photos[0][0].file_id;
+        const fileLink = await ctx.telegram.getFileLink(fileId);
+        photoUrl = fileLink.href || String(fileLink);
+      }
+    } catch (e) {
+      console.warn('[Telegram Bot] Contact photo fetch failed:', e);
+    }
+
     // Save/Register user in MongoDB ONLY when we have verified phone number
-    const user = await findOrCreateUser(telegramId, name, username, phoneNumber);
+    const user = await findOrCreateUser(telegramId, name, username, phoneNumber, photoUrl);
 
     const webAppUrl = process.env.TELEGRAM_WEBAPP_URL || 'https://joyly-bingo-v2.onrender.com';
 
