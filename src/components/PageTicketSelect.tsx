@@ -24,7 +24,7 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
 }) => {
   const [timerSeconds, setTimerSeconds] = useState<number>(35);
   const [realPlayersCount, setRealPlayersCount] = useState<number>(1);
-  const [realDerash, setRealDerash] = useState<number>(120);
+  const [realDerash, setRealDerash] = useState<number>(0);
   const [reservedTicketsMap, setReservedTicketsMap] = useState<Record<number, string>>({});
   const [activePreviewCartel, setActivePreviewCartel] = useState<Cartel | null>(null);
 

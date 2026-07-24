@@ -43,8 +43,10 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
   const [winnerTimer, setWinnerTimer] = useState<number>(5);
 
   // Real synchronized players count & Derash from Socket.IO server
-  const [playersCount, setPlayersCount] = useState<number>(18);
-  const [derash, setDerash] = useState<number>(stake * 8 || 80);
+  const [playersCount, setPlayersCount] = useState<number>(1);
+  const [derash, setDerash] = useState<number>(
+    selectedTickets.length > 0 ? selectedTickets.length * stake * 0.8 : 8
+  );
 
   const winHandledRef = useRef<boolean>(false);
   const leaveGameHandledRef = useRef<boolean>(false);
@@ -126,12 +128,8 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
     };
 
     const handleRoomState = (state: RoomState) => {
-      if (state.playersCount) setPlayersCount(state.playersCount);
-      if (state.derash) {
-        setDerash(Math.max(state.derash, stake * 8));
-      } else {
-        setDerash(stake * 8);
-      }
+      if (typeof state.playersCount === 'number') setPlayersCount(state.playersCount);
+      if (typeof state.derash === 'number') setDerash(state.derash);
       if (state.calledBalls && state.calledBalls.length > 0) {
         setCalledBalls(state.calledBalls);
         if (isAutomatic && activeCartels.length > 0) {

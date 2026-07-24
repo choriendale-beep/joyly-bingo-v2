@@ -48,6 +48,78 @@ function generateStandardBalls(): Ball[] {
   return balls;
 }
 
+export function validateBingoTicket(
+  grid: any[][],
+  calledNumbers: Set<number>
+): { isWin: boolean; pattern?: string } {
+  if (!Array.isArray(grid) || grid.length !== 5) return { isWin: false };
+
+  const isCellMarked = (r: number, c: number): boolean => {
+    const row = grid[r];
+    if (!Array.isArray(row) || row.length !== 5) return false;
+    const cell = row[c];
+    if (cell === undefined || cell === null) return false;
+
+    // Center cell (row 2, col 2) is FREE
+    if (r === 2 && c === 2) return true;
+
+    const val = typeof cell === 'object' ? cell.number : cell;
+    if (val === 'FREE' || val === 'free' || val === 0) return true;
+
+    if (typeof val === 'number') {
+      // Must strictly be present in server calledNumbers set
+      return calledNumbers.has(val);
+    }
+    return false;
+  };
+
+  // 1. Horizontal Rows (5 rows)
+  for (let r = 0; r < 5; r++) {
+    let rowWin = true;
+    for (let c = 0; c < 5; c++) {
+      if (!isCellMarked(r, c)) {
+        rowWin = false;
+        break;
+      }
+    }
+    if (rowWin) return { isWin: true, pattern: `Horizontal Row ${r + 1}` };
+  }
+
+  // 2. Vertical Columns (5 columns)
+  for (let c = 0; c < 5; c++) {
+    let colWin = true;
+    for (let r = 0; r < 5; r++) {
+      if (!isCellMarked(r, c)) {
+        colWin = false;
+        break;
+      }
+    }
+    if (colWin) return { isWin: true, pattern: `Vertical Column ${c + 1}` };
+  }
+
+  // 3. Main Diagonal (Top-Left to Bottom-Right)
+  let diag1 = true;
+  for (let i = 0; i < 5; i++) {
+    if (!isCellMarked(i, i)) {
+      diag1 = false;
+      break;
+    }
+  }
+  if (diag1) return { isWin: true, pattern: 'Main Diagonal' };
+
+  // 4. Reverse Diagonal (Top-Right to Bottom-Left)
+  let diag2 = true;
+  for (let i = 0; i < 5; i++) {
+    if (!isCellMarked(i, 4 - i)) {
+      diag2 = false;
+      break;
+    }
+  }
+  if (diag2) return { isWin: true, pattern: 'Reverse Diagonal' };
+
+  return { isWin: false };
+}
+
 class BingoGameManager {
   private io: SocketIOServer;
   public phase: 'TICKET_SELECT' | 'PLAYING' | 'WINNER_SHOW' = 'TICKET_SELECT';
@@ -203,19 +275,38 @@ class BingoGameManager {
     const player = this.players.get(socketId);
     if (!player || !player.selectedTickets || player.selectedTickets.length === 0) {
       console.log(`[Socket.IO] Blocked BINGO claim from socket ${socketId}: No tickets held.`);
+      this.io.to(socketId).emit('claim_rejected', { reason: 'No tickets purchased' });
       return;
     }
 
+    const cartel = claimData.cartel;
+    if (!cartel || !Array.isArray(cartel.grid)) {
+      console.log(`[Socket.IO] Blocked BINGO claim from socket ${socketId}: Invalid cartel format.`);
+      this.io.to(socketId).emit('claim_rejected', { reason: 'Invalid cartel matrix' });
+      return;
+    }
+
+    // STRICT MATHEMATICAL VALIDATION against server calledBalls
+    const calledNumbersSet = new Set(this.calledBalls.map((b) => b.number));
+    const validationResult = validateBingoTicket(cartel.grid, calledNumbersSet);
+
+    if (!validationResult.isWin) {
+      console.log(`[Socket.IO] REJECTED FALSE BINGO CLAIM from ${player.username} (socket: ${socketId}) on Ticket #${cartel.ticketNumber || cartel.id}`);
+      this.io.to(socketId).emit('claim_rejected', { reason: 'Incomplete bingo pattern' });
+      return; // REJECT CLAIM AND DO NOT STOP THE GAME LOOP!
+    }
+
     const winnerName = claimData.username || player.username || 'Player';
-    const ticketNum = claimData.cartel?.ticketNumber || claimData.cartel?.id || 1;
+    const ticketNum = cartel.ticketNumber || cartel.id || 1;
+    const dynamicPrize = this.getCalculateDerash();
 
     this.winnerInfo = {
       winnerName: winnerName,
       username: player.username || winnerName,
-      cartel: claimData.cartel,
+      cartel: cartel,
       ticketNumber: ticketNum,
-      prize: this.getCalculateDerash(),
-      pattern: claimData.pattern || 'BINGO',
+      prize: dynamicPrize,
+      pattern: validationResult.pattern || claimData.pattern || 'BINGO',
     };
 
     // Save record to MongoDB
