@@ -4,6 +4,7 @@ export interface IUser extends Document {
   telegramId: string;
   name: string;
   username?: string;
+  phoneNumber?: string;
   balance: number;
   gamesPlayed: number;
   gamesWon: number;
@@ -46,6 +47,7 @@ const UserSchema: Schema = new Schema({
   telegramId: { type: String, required: true, unique: true },
   name: { type: String, required: true },
   username: { type: String },
+  phoneNumber: { type: String },
   balance: { type: Number, default: 100 },
   gamesPlayed: { type: Number, default: 0 },
   gamesWon: { type: Number, default: 0 },
@@ -167,7 +169,7 @@ export async function connectMongoDB(): Promise<boolean> {
   }
 }
 
-export async function findOrCreateUser(telegramId: string, name: string, username?: string) {
+export async function findOrCreateUser(telegramId: string, name: string, username?: string, phoneNumber?: string) {
   if (isConnected) {
     try {
       let user = await UserModel.findOne({ telegramId });
@@ -176,8 +178,12 @@ export async function findOrCreateUser(telegramId: string, name: string, usernam
           telegramId,
           name,
           username,
+          phoneNumber,
           balance: 100,
         });
+      } else if (phoneNumber && !user.phoneNumber) {
+        user.phoneNumber = phoneNumber;
+        await user.save();
       }
       return user.toObject();
     } catch (e) {
@@ -191,12 +197,19 @@ export async function findOrCreateUser(telegramId: string, name: string, usernam
       telegramId,
       name,
       username,
+      phoneNumber,
       balance: 100,
       gamesPlayed: 0,
       gamesWon: 0,
       totalEarnings: 0,
       createdAt: new Date(),
     });
+  } else if (phoneNumber) {
+    const existing = inMemoryUsers.get(telegramId);
+    if (existing && !existing.phoneNumber) {
+      existing.phoneNumber = phoneNumber;
+      inMemoryUsers.set(telegramId, existing);
+    }
   }
   return inMemoryUsers.get(telegramId);
 }

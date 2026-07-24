@@ -205,7 +205,7 @@ if (process.env.NODE_ENV !== 'production') {
   });
   app.use(vite.middlewares);
 } else {
-  const frontendDir = path.resolve(__dirname, 'dist');
+  const frontendDir = path.join(process.cwd(), 'dist');
   app.use(express.static(frontendDir));
 
   app.get('/', (req, res) => {
@@ -213,7 +213,7 @@ if (process.env.NODE_ENV !== 'production') {
     if (fs.existsSync(indexPath)) {
       return res.sendFile(indexPath);
     }
-    return res.status(404).send('Frontend build not found.');
+    return res.status(404).send('Frontend build not found. Please run "npm run build" before starting the server.');
   });
 
   app.get('*', (req, res, next) => {
@@ -224,7 +224,7 @@ if (process.env.NODE_ENV !== 'production') {
     if (fs.existsSync(indexPath)) {
       return res.sendFile(indexPath);
     }
-    return res.status(404).send('Frontend build not found.');
+    return res.status(404).send('Frontend build not found. Please run "npm run build" before starting the server.');
   });
 }
 
@@ -243,7 +243,7 @@ const startServer = () => {
 
 const startBot = async () => {
   try {
-    const botModule = await import('./src/bot');
+    const botModule = await import('./src/bot.js');
     const startTelegramBot = botModule.startBot;
     const bot = botModule.bot;
 
