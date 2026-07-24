@@ -127,13 +127,40 @@ class BingoGameManager {
         this.timerSeconds--;
         this.broadcastRoomState();
       } else {
-        if (this.intervalTimer) clearInterval(this.intervalTimer);
-        this.startPlayingPhase();
+        // Check for active ticket holders before transitioning to PLAYING
+        const activeTicketHolders = Array.from(this.players.values()).filter(
+          (p) => p.selectedTickets && p.selectedTickets.length > 0
+        );
+
+        if (activeTicketHolders.length > 0) {
+          if (this.intervalTimer) clearInterval(this.intervalTimer);
+          this.startPlayingPhase();
+        } else {
+          // No active players with tickets: DO NOT start game. Reset timer to 35 seconds.
+          this.timerSeconds = 35;
+          this.io.emit('waiting_for_players', {
+            message: 'Waiting for players to buy tickets...',
+            timerSeconds: 35,
+          });
+          this.broadcastRoomState();
+        }
       }
     }, 1000);
   }
 
   public startPlayingPhase() {
+    // Safety check: ensure at least 1 player has bought a ticket
+    const activeTicketHolders = Array.from(this.players.values()).filter(
+      (p) => p.selectedTickets && p.selectedTickets.length > 0
+    );
+
+    if (activeTicketHolders.length === 0) {
+      this.timerSeconds = 35;
+      this.phase = 'TICKET_SELECT';
+      this.broadcastRoomState();
+      return;
+    }
+
     this.phase = 'PLAYING';
     this.remainingBalls = generateStandardBalls();
     this.calledBalls = [];

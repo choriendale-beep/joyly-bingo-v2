@@ -41,17 +41,11 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
   // Local fallback 35-second timer countdown
   useEffect(() => {
     const timerInterval = setInterval(() => {
-      setTimerSeconds((prev) => {
-        if (prev <= 1) {
-          onTimerExpired();
-          return 35;
-        }
-        return prev - 1;
-      });
+      setTimerSeconds((prev) => (prev <= 1 ? 35 : prev - 1));
     }, 1000);
 
     return () => clearInterval(timerInterval);
-  }, [onTimerExpired]);
+  }, []);
 
   // Listen to Socket.IO real-time room updates
   useEffect(() => {
@@ -67,9 +61,11 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
     };
 
     socket.on('room_state', handleRoomState);
+    socket.on('game_state_update', handleRoomState);
 
     return () => {
       socket.off('room_state', handleRoomState);
+      socket.off('game_state_update', handleRoomState);
     };
   }, [onTimerExpired]);
 
