@@ -51,20 +51,28 @@ export const App: React.FC = () => {
     ticketsRef.current = tickets;
   }, [tickets]);
 
-  // Load Telegram user or default on mount
+  // Load Telegram user and periodically sync profile and balance from MongoDB Atlas
   useEffect(() => {
     const p = getStoredPlayer();
     setPlayer(p);
 
-    // Sync profile and balance from MongoDB Atlas
-    syncPlayerProfile(p.id)
-      .then((synced) => {
-        if (synced) {
-          setPlayer(synced);
-        }
-      })
-      .catch(() => {});
-  }, []);
+    const sync = () => {
+      syncPlayerProfile(p.id)
+        .then((synced) => {
+          if (synced) {
+            setPlayer(synced);
+          }
+        })
+        .catch(() => {});
+    };
+
+    // Sync immediately
+    sync();
+
+    // Set up periodic polling every 5 seconds to capture direct MongoDB balance changes
+    const interval = setInterval(sync, 5000);
+    return () => clearInterval(interval);
+  }, [activeTab, gameStage]);
 
   // Synchronize room state across Socket.IO
   useEffect(() => {
