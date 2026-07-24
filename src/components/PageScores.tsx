@@ -23,7 +23,7 @@ export const PageScores: React.FC = () => {
           setLeaderboards(data.leaderboard);
         }
       })
-      .catch((err) => console.error('Failed to fetch live leaderboard:', err));
+      .catch(() => {});
   }, []);
 
   return (

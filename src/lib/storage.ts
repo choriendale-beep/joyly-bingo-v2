@@ -266,7 +266,8 @@ export async function syncPlayerProfile(playerId: string): Promise<Player | null
       return synced;
     }
   } catch (e) {
-    console.error('Failed to sync player profile with backend:', e);
+    // Graceful fallback for network or server initialization state
+    return null;
   }
   return null;
 }

@@ -66,11 +66,9 @@ class BingoGameManager {
   }
 
   public getRealPlayersCount(): number {
-    const activePlayersWithTickets = Array.from(this.players.values()).filter(
+    return Array.from(this.players.values()).filter(
       (p) => p.selectedTickets && p.selectedTickets.length > 0
     ).length;
-    const connectedClients = this.io ? this.io.engine.clientsCount : 0;
-    return Math.max(activePlayersWithTickets, connectedClients, 1);
   }
 
   public getTotalStakedTickets(): number {
@@ -82,13 +80,13 @@ class BingoGameManager {
   }
 
   public getCalculateDerash(): number {
-    let activeStake = 10;
+    let derashTotal = 0;
     this.players.forEach((p) => {
-      if (p.stake) {
-        activeStake = p.stake;
-      }
+      const ticketCount = p.selectedTickets ? p.selectedTickets.length : 0;
+      const ticketStake = p.stake || 10;
+      derashTotal += ticketCount * (ticketStake * 0.8);
     });
-    return activeStake * 8;
+    return Math.round(derashTotal * 100) / 100;
   }
 
   public getReservedTicketsMap(): Record<number, string> {
@@ -250,12 +248,19 @@ class BingoGameManager {
   }
 
   public broadcastRoomState() {
+    const realPlayers = this.getRealPlayersCount();
+    const totalStaked = this.getTotalStakedTickets();
+    const derashVal = this.getCalculateDerash();
+
     const payload = {
       phase: this.phase,
       timerSeconds: this.timerSeconds,
-      playersCount: this.getRealPlayersCount(),
-      stakedTickets: this.getTotalStakedTickets(),
-      derash: this.getCalculateDerash(),
+      playersCount: realPlayers,
+      totalPlayers: realPlayers,
+      stakedTickets: totalStaked,
+      totalTickets: totalStaked,
+      derash: derashVal,
+      derashAmount: derashVal,
       gameId: this.gameId,
       calledBalls: this.calledBalls,
       currentBall: this.currentBall,

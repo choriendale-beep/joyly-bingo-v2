@@ -42,8 +42,7 @@ export const TransactionsModal: React.FC<TransactionsModalProps> = ({
           }
           setLoading(false);
         })
-        .catch((err) => {
-          console.error('Failed to fetch transaction history:', err);
+        .catch(() => {
           setLoading(false);
         });
     }

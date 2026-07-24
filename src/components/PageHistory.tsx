@@ -33,8 +33,7 @@ export const PageHistory: React.FC = () => {
         }
         setLoading(false);
       })
-      .catch((err) => {
-        console.error('Failed to fetch match history:', err);
+      .catch(() => {
         setLoading(false);
       });
   }, []);
