@@ -206,7 +206,15 @@ if (process.env.NODE_ENV !== 'production') {
   app.use(vite.middlewares);
 } else {
   const frontendDir = path.resolve(__dirname, 'dist');
-  app.use(express.static(frontendDir, { index: false }));
+  app.use(express.static(frontendDir));
+
+  app.get('/', (req, res) => {
+    const indexPath = path.join(frontendDir, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      return res.sendFile(indexPath);
+    }
+    return res.status(404).send('Frontend build not found.');
+  });
 
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/')) {
