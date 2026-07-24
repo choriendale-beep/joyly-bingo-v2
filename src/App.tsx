@@ -84,10 +84,13 @@ export const App: React.FC = () => {
       if (state.phase) {
         setRoomPhase(state.phase);
       }
-      if (state.gameId && state.gameId !== gameId) {
-        setGameId(state.gameId);
-        // Clear selected tickets for new game ID
-        setTickets((prev) => prev.map((t) => ({ ...t, selected: false })));
+      if (state.gameId) {
+        setGameId((prevGameId) => {
+          if (prevGameId !== state.gameId) {
+            setTickets((prev) => prev.map((t) => ({ ...t, selected: false })));
+          }
+          return state.gameId;
+        });
       }
       if (state.phase === 'PLAYING' && activeTab === 'GAME' && gameStage === 'TICKET_SELECT') {
         handleStartLiveGame();
@@ -113,7 +116,7 @@ export const App: React.FC = () => {
       socket.off('game_state_update', handleRoomState);
       socket.off('reset_to_lobby', handleResetToLobby);
     };
-  }, [activeTab, gameStage, gameId]);
+  }, [activeTab, gameStage]);
 
   // Handle Ticket Toggle
   const handleToggleTicket = (ticketNum: number) => {
@@ -171,15 +174,11 @@ export const App: React.FC = () => {
     const count = selected.length;
     const totalCost = count * selectedStake;
 
-    // Generate random Game ID
-    const randomGameId = 'DB' + Math.random().toString(36).substring(2, 8).toUpperCase();
-    setGameId(randomGameId);
-
-    // Record initial match history entry if user bought tickets
+    // Record initial match history entry if user bought tickets using current synchronized gameId
     if (count > 0) {
       addGameHistory({
         id: `gh-${Date.now()}`,
-        gameId: randomGameId,
+        gameId: gameId || 'DB_GLOBAL',
         date: 'Just now',
         stake: totalCost,
         ticketsCount: count,

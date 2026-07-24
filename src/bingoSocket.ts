@@ -263,12 +263,18 @@ class BingoGameManager {
       winnerInfo: this.winnerInfo,
     };
 
+    this.io.to('GLOBAL_ROOM').emit('room_state', payload);
+    this.io.to('GLOBAL_ROOM').emit('game_state_update', payload);
     this.io.emit('room_state', payload);
     this.io.emit('game_state_update', payload);
   }
 
   public handleConnection(socket: Socket) {
     console.log(`[Socket.IO] Client connected: ${socket.id}`);
+
+    // Join single global game room
+    socket.join('GLOBAL_ROOM');
+    socket.join(this.gameId);
 
     // Initial state sent to newly connected client
     const initialPayload = {
@@ -288,6 +294,9 @@ class BingoGameManager {
     socket.emit('game_state_update', initialPayload);
 
     const handleJoin = (data: { username?: string; selectedTickets?: number[]; stake?: number }) => {
+      socket.join('GLOBAL_ROOM');
+      socket.join(this.gameId);
+
       const ticketsList = Array.isArray(data?.selectedTickets) ? data.selectedTickets : [];
 
       this.players.set(socket.id, {
@@ -303,6 +312,17 @@ class BingoGameManager {
         );
       }
 
+      // Immediately reply with active room state
+      socket.emit('room_state', {
+        ...initialPayload,
+        phase: this.phase,
+        timerSeconds: this.timerSeconds,
+        gameId: this.gameId,
+        calledBalls: this.calledBalls,
+        currentBall: this.currentBall,
+        winnerInfo: this.winnerInfo,
+      });
+
       this.broadcastRoomState();
     };
 
@@ -310,12 +330,30 @@ class BingoGameManager {
     socket.on('join_room', handleJoin);
 
     socket.on('spectate_game', (data: { username?: string }) => {
+      socket.join('GLOBAL_ROOM');
+      socket.join(this.gameId);
+
       this.players.set(socket.id, {
         socketId: socket.id,
         username: data?.username || 'Spectator',
         selectedTickets: [],
         stake: 10,
       });
+
+      // Immediately reply with active room state for spectator
+      socket.emit('room_state', {
+        phase: this.phase,
+        timerSeconds: this.timerSeconds,
+        playersCount: this.getRealPlayersCount(),
+        stakedTickets: this.getTotalStakedTickets(),
+        derash: this.getCalculateDerash(),
+        gameId: this.gameId,
+        calledBalls: this.calledBalls,
+        currentBall: this.currentBall,
+        reservedTickets: this.getReservedTicketsMap(),
+        winnerInfo: this.winnerInfo,
+      });
+
       this.broadcastRoomState();
     });
 
