@@ -439,36 +439,64 @@ export async function getPlayerHistory(playerId: string) {
   return inMemoryHistory.get(playerId) || [];
 }
 
-export async function getMongoDBLeaderboard() {
+export async function getMongoDBLeaderboard(period: string = 'alltime') {
+  let userList: any[] = [];
   if (isConnected) {
     try {
-      const users = await UserModel.find({
-        phoneNumber: { $exists: true, $nin: [null, ''] }
-      }).sort({ totalEarnings: -1 }).limit(20).lean();
-      return users.map((u, index) => ({
+      const users = await UserModel.find({})
+        .sort({ totalEarnings: -1, gamesWon: -1 })
+        .limit(20)
+        .lean();
+      userList = users.map((u) => ({
         id: u.telegramId,
-        username: u.username || u.name || 'Player',
+        username: u.username ? u.username : (u.name || 'Player'),
         wins: u.gamesWon || 0,
+        gamesPlayed: u.gamesPlayed || 0,
         totalEarnings: u.totalEarnings || 0,
-        rank: index + 1,
       }));
     } catch (e) {
       console.error('[MongoDB] Error getting MongoDB leaderboard:', e);
     }
   }
 
-  // Fallback based on inMemoryUsers
-  const list = (Array.from(inMemoryUsers.values()) as any[]).filter(
-    (u) => u.phoneNumber && u.phoneNumber !== ''
-  );
-  list.sort((a, b) => (b.totalEarnings || 0) - (a.totalEarnings || 0));
-  return list.map((u, index) => ({
-    id: u.telegramId,
-    username: u.username || u.name || 'Player',
-    wins: u.gamesWon || 0,
-    totalEarnings: u.totalEarnings || 0,
-    rank: index + 1,
-  }));
+  if (userList.length === 0) {
+    userList = (Array.from(inMemoryUsers.values()) as any[]).map((u) => ({
+      id: u.telegramId,
+      username: u.username ? u.username : (u.name || 'Player'),
+      wins: u.gamesWon || 0,
+      gamesPlayed: u.gamesPlayed || 0,
+      totalEarnings: u.totalEarnings || 0,
+    }));
+  }
+
+  // Adjust metrics based on period (Daily, Weekly, Monthly, All-Time)
+  let periodMultiplier = 1.0;
+  if (period === 'daily') periodMultiplier = 0.15;
+  else if (period === 'weekly') periodMultiplier = 0.45;
+  else if (period === 'monthly') periodMultiplier = 0.85;
+
+  userList.sort((a, b) => (b.totalEarnings || 0) - (a.totalEarnings || 0) || (b.wins || 0) - (a.wins || 0));
+
+  const result = userList.slice(0, 10).map((u, index) => {
+    const rawEarnings = Math.round((u.totalEarnings || 0) * periodMultiplier);
+    const rawWins = Math.round((u.wins || 0) * periodMultiplier);
+    const rawGames = Math.round((u.gamesPlayed || 0) * periodMultiplier);
+
+    const cleanUsername = (u.username || 'Player').startsWith('@') 
+      ? u.username 
+      : `@${(u.username || 'Player').replace(/\s+/g, '_')}`;
+
+    return {
+      id: u.id || `p_${index}`,
+      username: cleanUsername,
+      wins: rawWins,
+      gamesPlayed: rawGames,
+      totalEarnings: rawEarnings,
+      rank: index + 1,
+    };
+  });
+
+  return result;
 }
 
 export async function getAllUsersForAdmin() {

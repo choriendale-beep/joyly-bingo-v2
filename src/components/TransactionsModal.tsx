@@ -86,9 +86,9 @@ export const TransactionsModal: React.FC<TransactionsModalProps> = ({
           ) : transactions.length === 0 ? (
             <div className="py-8 text-center text-slate-500 text-xs">No transactions found yet.</div>
           ) : (
-            transactions.map((tx) => (
+            transactions.map((tx, idx) => (
               <div
-                key={tx.id}
+                key={`${tx.id || 'tx'}-${idx}`}
                 className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-3 flex items-center justify-between"
               >
                 <div className="flex items-center gap-3">

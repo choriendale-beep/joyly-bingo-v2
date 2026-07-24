@@ -50,9 +50,9 @@ export const PageHistory: React.FC = () => {
 
       <div className="space-y-2.5">
         {historyData.length > 0 ? (
-          historyData.map((item) => (
+          historyData.map((item, index) => (
             <div
-              key={item.id}
+              key={`${item.id || 'hist'}-${index}`}
               className="bg-[#181d30] border border-slate-800 rounded-2xl p-3 flex items-center justify-between"
             >
               <div className="flex items-center gap-3">

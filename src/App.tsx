@@ -78,8 +78,57 @@ export const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [activeTab, gameStage]);
 
-  // Synchronize room state across Socket.IO
+  // Handle Game Win
+  const creditedWinGamesRef = useRef<Set<string>>(new Set());
+
+  const handleGameWin = async (prizeAmount: number, pattern: string) => {
+    const currentWinKey = `${gameId}-${prizeAmount}`;
+    if (creditedWinGamesRef.current.has(currentWinKey)) {
+      return;
+    }
+    creditedWinGamesRef.current.add(currentWinKey);
+
+    const updated = updateBalance(
+      prizeAmount,
+      'win',
+      `Won Bingo Derash (${pattern})`
+    );
+    setPlayer(updated);
+
+    const selected = tickets.filter((t) => t.selected);
+    const count = selected.length > 0 ? selected.length : 1;
+
+    // Record win in history
+    addGameHistory({
+      id: `gh-win-${Date.now()}`,
+      gameId: gameId,
+      date: 'Just now',
+      stake: count * selectedStake,
+      ticketsCount: count,
+      potWon: prizeAmount,
+      status: 'WON',
+      pattern,
+    });
+  };
+
+  // Synchronize room state and global winner announcements across Socket.IO
   useEffect(() => {
+    const handleWinnerAnnounced = (data: { winnerInfo: any; gameId?: string }) => {
+      if (data?.winnerInfo) {
+        const winnerSocketId = data.winnerInfo.winnerSocketId;
+        const winnerName = data.winnerInfo.winnerName;
+        const currentName = player.first_name || player.username;
+
+        const isMe = winnerSocketId
+          ? winnerSocketId === socket.id
+          : Boolean(currentName && (winnerName === currentName || data.winnerInfo.username === currentName) && currentName !== 'Player' && currentName !== 'You');
+
+        if (isMe) {
+          handleGameWin(data.winnerInfo.prize || 0, data.winnerInfo.pattern || 'BINGO');
+        }
+      }
+    };
+
     const handleRoomState = (state: RoomState) => {
       if (state.phase) {
         setRoomPhase(state.phase);
@@ -107,16 +156,20 @@ export const App: React.FC = () => {
       setTickets((prev) => prev.map((t) => ({ ...t, selected: false })));
     };
 
+    socket.on('winner_announced', handleWinnerAnnounced);
+    socket.on('game_over', handleWinnerAnnounced);
     socket.on('room_state', handleRoomState);
     socket.on('game_state_update', handleRoomState);
     socket.on('reset_to_lobby', handleResetToLobby);
 
     return () => {
+      socket.off('winner_announced', handleWinnerAnnounced);
+      socket.off('game_over', handleWinnerAnnounced);
       socket.off('room_state', handleRoomState);
       socket.off('game_state_update', handleRoomState);
       socket.off('reset_to_lobby', handleResetToLobby);
     };
-  }, [activeTab, gameStage]);
+  }, [activeTab, gameStage, player, gameId]);
 
   // Handle Ticket Toggle
   const handleToggleTicket = (ticketNum: number) => {
@@ -124,6 +177,11 @@ export const App: React.FC = () => {
     if (!targetTicket) return;
 
     if (!targetTicket.selected) {
+      const selectedCount = tickets.filter((t) => t.selected).length;
+      if (selectedCount >= 6) {
+        alert('ከ 6 ቲኬት በላይ መያዝ አይችሉም! (በአንድ ጨዋታ ከፍተኛው 6 ቲኬት ብቻ)');
+        return;
+      }
       if (player.balance < selectedStake) {
         alert(`የቦርሳዎ ሂሳብ በቂ አይደለም! ቲኬት ለመምረጥ ${selectedStake} ETB ያስፈልጋል።`);
         return;
@@ -188,31 +246,6 @@ export const App: React.FC = () => {
     }
 
     setGameStage('PLAYING');
-  };
-
-  // Handle Game Win
-  const handleGameWin = async (prizeAmount: number, pattern: string) => {
-    const updated = updateBalance(
-      prizeAmount,
-      'win',
-      `Won Bingo Derash (${pattern})`
-    );
-    setPlayer(updated);
-
-    const selected = tickets.filter((t) => t.selected);
-    const count = selected.length > 0 ? selected.length : 1;
-
-    // Record win in history
-    addGameHistory({
-      id: `gh-win-${Date.now()}`,
-      gameId: gameId,
-      date: 'Just now',
-      stake: count * selectedStake,
-      ticketsCount: count,
-      potWon: prizeAmount,
-      status: 'WON',
-      pattern,
-    });
   };
 
   // Handle Wallet submission
@@ -280,12 +313,15 @@ export const App: React.FC = () => {
               stake={selectedStake}
               selectedTickets={selectedTicketsList}
               onLeaveGame={() => {
-                setTickets((prev) => prev.map((t) => ({ ...t, selected: false })));
+                if (roomPhase === 'TICKET_SELECT') {
+                  setTickets((prev) => prev.map((t) => ({ ...t, selected: false })));
+                }
                 setGameStage('HOME');
               }}
               onWin={handleGameWin}
               soundEnabled={soundEnabled}
               setSoundEnabled={setSoundEnabled}
+              onOpenProfile={() => setActiveTab('PROFILE')}
             />
           )}
         </>
@@ -298,17 +334,14 @@ export const App: React.FC = () => {
       {activeTab === 'WALLET' && (
         <PageWallet
           player={player}
-          onOpenDeposit={() => setWalletModal({ open: true, type: 'deposit' })}
-          onOpenWithdraw={() => setWalletModal({ open: true, type: 'withdraw' })}
           onOpenTransactions={() => setTransactionsOpen(true)}
-          onClaimBonus={() => handleQuickAddBonus(50)}
         />
       )}
 
       {activeTab === 'PROFILE' && <PageProfile player={player} />}
 
       {/* Bottom Navigation Bar across all views */}
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} botHandle="@dilbingo_bot" />
+      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Rules Modal */}
       <RulesModal isOpen={rulesOpen} onClose={() => setRulesOpen(false)} />

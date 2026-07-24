@@ -68,17 +68,6 @@ export const PageHome: React.FC<PageHomeProps> = ({
             <span>PLAY 10 ETB</span>
           </button>
 
-          {/* Quick Bonus / Add Funds Button */}
-          {onQuickAddBonus && (
-            <button
-              onClick={onQuickAddBonus}
-              className="w-full bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer transition active:scale-95"
-            >
-              <Gift className="w-4 h-4 text-amber-400" />
-              <span>CLAIM +100 ETB FREE GAME BONUS</span>
-            </button>
-          )}
-
           {/* Wallet Balance Display */}
           <div className="text-center space-y-1 border-t border-slate-800/80 pt-4 w-full">
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">

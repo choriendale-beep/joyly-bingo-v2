@@ -13,6 +13,7 @@ interface PageLiveGameProps {
   onWin: (prize: number, pattern: string) => void;
   soundEnabled: boolean;
   setSoundEnabled: (val: boolean) => void;
+  onOpenProfile?: () => void;
 }
 
 export const PageLiveGame: React.FC<PageLiveGameProps> = ({
@@ -24,6 +25,7 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
   onWin,
   soundEnabled,
   setSoundEnabled,
+  onOpenProfile,
 }) => {
   const isSpectator = selectedTickets.length === 0;
   const [isAutomatic, setIsAutomatic] = useState<boolean>(true);
@@ -35,6 +37,7 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
   const [winningInfo, setWinningInfo] = useState<{
     winnerName: string;
     username?: string;
+    winnerSocketId?: string;
     cartel: Cartel;
     ticketNumber?: number;
     prize: number;
@@ -109,14 +112,26 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
 
     const handleGameOver = (data: { winnerInfo: any }) => {
       if (data.winnerInfo) {
-        setWinningInfo({
+        const info = {
           winnerName: data.winnerInfo.winnerName,
           username: data.winnerInfo.username,
+          winnerSocketId: data.winnerInfo.winnerSocketId,
           cartel: data.winnerInfo.cartel || activeCartels[0] || { grid: [], ticketNumber: 1 },
           ticketNumber: data.winnerInfo.ticketNumber || data.winnerInfo.cartel?.ticketNumber,
           prize: data.winnerInfo.prize || derash,
           pattern: data.winnerInfo.pattern || 'BINGO',
-        });
+        };
+        setWinningInfo(info);
+
+        const currentName = player.first_name || player.username;
+        const isMe = data.winnerInfo.winnerSocketId
+          ? data.winnerInfo.winnerSocketId === socket.id
+          : Boolean(currentName && (data.winnerInfo.winnerName === currentName || data.winnerInfo.username === currentName) && currentName !== 'Player' && currentName !== 'You');
+
+        if (isMe && !winHandledRef.current) {
+          winHandledRef.current = true;
+          onWin(data.winnerInfo.prize || derash, data.winnerInfo.pattern || 'BINGO');
+        }
       }
     };
 
@@ -188,7 +203,7 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
     };
   }, [isAutomatic, activeCartels, derash, selectedTickets, player, stake, onLeaveGame]);
 
-  // Check win condition locally and broadcast to socket
+  // Check win condition locally and broadcast claim to socket
   useEffect(() => {
     if (isSpectator || winningInfo || winHandledRef.current) return;
 
@@ -196,22 +211,14 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
     for (const cartel of activeCartels) {
       const winRes = checkBingoWin(cartel.grid, calledNums);
       if (winRes.isWin) {
-        winHandledRef.current = true;
+        // Send claim request to backend for strict validation.
+        // Winner state and prize will be handled upon server 'winner_announced' event.
         const winnerName = player.first_name || player.username || 'You';
-        setWinningInfo({
-          winnerName,
-          username: player.username,
-          cartel,
-          ticketNumber: cartel.ticketNumber,
-          prize: derash,
-          pattern: winRes.pattern || 'BINGO',
-        });
-        onWin(derash, winRes.pattern || 'BINGO');
         emitClaimBingo(winnerName, cartel, winRes.pattern || 'BINGO');
         break;
       }
     }
-  }, [calledBalls, activeCartels, winningInfo, derash, onWin, player, isSpectator]);
+  }, [calledBalls, activeCartels, winningInfo, player, isSpectator]);
 
   // Winner 5-Second Countdown Timer
   useEffect(() => {
@@ -267,12 +274,51 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
 
   return (
     <div className="flex-1 flex flex-col max-w-md mx-auto w-full px-2 pt-2 pb-20 text-white">
+      {/* Player Header Bar */}
+      <div className="flex items-center justify-between bg-[#181d30] border border-slate-800 px-3 py-1.5 rounded-2xl mb-2 text-xs">
+        <button
+          onClick={onOpenProfile}
+          className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition"
+          title="View Telegram Profile"
+        >
+          {player.photo_url ? (
+            <img
+              src={player.photo_url}
+              alt={player.first_name || 'Profile'}
+              className="w-6 h-6 rounded-full object-cover border border-amber-400"
+            />
+          ) : (
+            <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 text-slate-950 font-black flex items-center justify-center text-[10px]">
+              {player.first_name?.[0] || 'P'}
+            </div>
+          )}
+          <div className="text-left">
+            <span className="font-bold text-slate-200 text-xs block leading-none">
+              {player.first_name || player.username || 'Player'}
+            </span>
+            {player.username && (
+              <span className="text-[9px] text-amber-400 block leading-tight">
+                @{player.username.replace('@', '')}
+              </span>
+            )}
+          </div>
+        </button>
+
+        <button
+          onClick={onLeaveGame}
+          className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-xl text-[10px] font-bold border border-slate-700 flex items-center gap-1 cursor-pointer transition"
+        >
+          <LogOut className="w-3 h-3 text-rose-400" />
+          <span>Leave</span>
+        </button>
+      </div>
+
       {/* Spectator Mode Banner */}
       {isSpectator && (
         <div className="flex items-center justify-between bg-sky-950/70 border border-sky-800/80 px-3 py-2 rounded-2xl text-sky-300 text-xs font-bold mb-2 shadow-lg backdrop-blur-sm">
           <div className="flex items-center gap-2">
             <Eye className="w-4 h-4 text-sky-400 animate-pulse" />
-            <span>Spectating Live Match / ተመልካች</span>
+            <span>ተመልካች ({player.first_name || player.username || 'Spectator'}) - Spectator Mode</span>
           </div>
           <span className="text-[10px] uppercase tracking-wider text-sky-400/90 font-mono bg-sky-900/60 px-2 py-0.5 rounded-full border border-sky-700/50">
             Observer
@@ -497,14 +543,14 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
             {/* Winner Details */}
             <div>
               <h2 className="text-2xl font-black text-amber-400 uppercase tracking-wide">
-                🎉 BINGO WINNER! 🎉
+                {winningInfo.winnerSocketId === socket.id ? '🏆 YOU WON! 🏆' : '🎉 BINGO WINNER! 🎉'}
               </h2>
               <p className="text-lg font-black text-white mt-0.5">
                 {winningInfo.winnerName}
               </p>
-              {winningInfo.username && (
+              {winningInfo.username && winningInfo.username !== winningInfo.winnerName && winningInfo.username !== 'Player' && (
                 <p className="text-xs font-semibold text-slate-400">
-                  @{winningInfo.username}
+                  {winningInfo.username}
                 </p>
               )}
               <div className="inline-flex items-center gap-2 mt-2 px-3 py-1 bg-amber-500/20 rounded-full border border-amber-500/40">

@@ -32,15 +32,19 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
           </div>
           <div className="flex items-start gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-            <span><strong>2. Select Tickets:</strong> Choose 1 or more Cartels from the 1..88/400 ticket grid before the 35s timer ends!</span>
+            <span><strong>2. Select Tickets (Max 6):</strong> Pick 1 to 6 Cartels from the 1..400 grid before the timer ends.</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <span><strong>3. Reserved Tickets:</strong> Tickets taken by other players turn <strong>ORANGE</strong> and cannot be selected by anyone else.</span>
           </div>
           <div className="flex items-start gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-            <span><strong>3. Live Drawing:</strong> Numbers 1–75 are called automatically. Match numbers on your Cartel!</span>
+            <span><strong>4. Live Drawing:</strong> Numbers 1–75 are called automatically. Match numbers on your Cartel!</span>
           </div>
           <div className="flex items-start gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-            <span><strong>4. Win Derash (Pot):</strong> Complete a line (row, col, diagonal, 4 corners) to trigger automatic or manual BINGO win!</span>
+            <span><strong>5. Win Derash (Pot):</strong> Complete a line (row, col, diagonal, 4 corners) to trigger automatic or manual BINGO win!</span>
           </div>
         </div>
 

@@ -42,6 +42,7 @@ export interface ScoreEntry {
   id: string;
   username: string;
   wins: number;
+  gamesPlayed?: number;
   totalEarnings: number;
   rank: number;
 }
@@ -65,4 +66,14 @@ export interface Transaction {
   status: 'completed' | 'pending';
   createdAt: string;
   description?: string;
+}
+
+export interface WinnerInfo {
+  winnerName: string;
+  username?: string;
+  winnerSocketId?: string;
+  cartel?: Cartel;
+  ticketNumber?: number;
+  prize: number;
+  pattern: string;
 }

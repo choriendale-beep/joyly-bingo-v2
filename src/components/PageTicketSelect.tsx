@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Player, TicketItem, Cartel } from '../types';
-import { ArrowLeft, RefreshCw, Lock } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Lock, Clock } from 'lucide-react';
 import { socket, emitSelectTickets, RoomState } from '../lib/socket';
 
 interface PageTicketSelectProps {
@@ -51,8 +51,8 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
   useEffect(() => {
     const handleRoomState = (state: RoomState) => {
       if (typeof state.timerSeconds === 'number') setTimerSeconds(state.timerSeconds);
-      if (state.playersCount) setRealPlayersCount(state.playersCount);
-      if (state.derash) setRealDerash(state.derash);
+      if (typeof state.playersCount === 'number') setRealPlayersCount(state.playersCount);
+      if (typeof state.derash === 'number') setRealDerash(state.derash);
       if (state.reservedTickets) setReservedTicketsMap(state.reservedTickets);
 
       if (state.phase === 'PLAYING') {
@@ -104,17 +104,17 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
       {/* Top Stats Bar */}
       <div className="grid grid-cols-4 gap-2 bg-[#181d30] border border-slate-800 p-2.5 rounded-2xl mb-3 text-center">
         <div className="bg-slate-900/65 p-1.5 rounded-xl border border-slate-800 flex flex-col justify-center">
-          <div className="text-[9px] text-slate-400 font-semibold uppercase">WALLET</div>
-          <div className="text-[11px] font-bold text-slate-100 truncate">{player.balance} ETB</div>
+          <div className="text-[9px] text-slate-400 font-semibold uppercase">PLAYERS</div>
+          <div className="text-xs font-bold text-sky-400">{realPlayersCount}</div>
         </div>
 
         <div className="bg-slate-900/65 p-1.5 rounded-xl border border-slate-800 flex flex-col justify-center">
-          <div className="text-[9px] text-slate-400 font-semibold uppercase">TICKETS</div>
-          <div className="text-xs font-bold text-emerald-400">{selectedTickets.length}</div>
+          <div className="text-[9px] text-slate-400 font-semibold uppercase">BALANCE</div>
+          <div className="text-[11px] font-bold text-emerald-400 truncate">{player.balance} ETB</div>
         </div>
 
         <div className="bg-slate-900/65 p-1.5 rounded-xl border border-slate-800 flex flex-col justify-center">
-          <div className="text-[9px] text-slate-400 font-semibold uppercase">STAKE</div>
+          <div className="text-[9px] text-amber-400 font-semibold uppercase">STAKE</div>
           <div className="text-[11px] font-bold text-amber-400 truncate">
             {selectedTickets.length * stake} ETB
           </div>
@@ -127,6 +127,7 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
           </div>
         </div>
       </div>
+
 
       {/* 1..400 Ticket Grid */}
       <div className="bg-[#181d30] border border-slate-800 rounded-2xl p-2.5 max-h-[260px] overflow-y-auto mb-3">
@@ -141,23 +142,19 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
                 key={ticket.number}
                 disabled={isTakenByOther}
                 onClick={() => !isTakenByOther && onToggleTicket(ticket.number)}
-                title={isTakenByOther ? `Taken by ${reservedOwner}` : `Ticket #${ticket.number}`}
+                title={isTakenByOther ? `በሌላ ሰው የተያዘ (${reservedOwner})` : `Ticket #${ticket.number}`}
                 className={`
-                  aspect-square rounded-lg flex flex-col items-center justify-center font-bold text-xs transition-colors cursor-pointer select-none relative
+                  aspect-square rounded-lg flex flex-col items-center justify-center font-extrabold text-xs transition-all cursor-pointer select-none relative
                   ${
                     isTakenByOther
-                      ? 'bg-slate-900/90 text-slate-600 border border-slate-800/80 cursor-not-allowed opacity-50'
+                      ? 'bg-orange-600 text-white border border-orange-400/90 shadow-sm opacity-95 cursor-not-allowed'
                       : isSelected
-                      ? 'bg-amber-500 text-slate-950 font-black border border-amber-300 shadow-sm scale-105'
+                      ? 'bg-amber-400 text-slate-950 font-black border-2 border-amber-300 shadow-md scale-105'
                       : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60'
                   }
                 `}
               >
-                {isTakenByOther ? (
-                  <Lock className="w-3 h-3 text-red-400/70" />
-                ) : (
-                  ticket.number
-                )}
+                {ticket.number}
               </button>
             );
           })}

@@ -5,13 +5,11 @@ import { Gamepad2, Trophy, Clock, Wallet, User, Shield } from 'lucide-react';
 interface BottomNavProps {
   activeTab: NavTab;
   onTabChange: (tab: NavTab) => void;
-  botHandle?: string;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({
   activeTab,
   onTabChange,
-  botHandle = '@dilbingo_bot',
 }) => {
   const tabs = [
     { id: 'GAME' as NavTab, label: 'GAME', icon: Gamepad2 },
@@ -42,9 +40,6 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             </button>
           );
         })}
-      </div>
-      <div className="text-center pb-1 text-[10px] text-slate-500 font-mono">
-        {botHandle}
       </div>
     </footer>
   );

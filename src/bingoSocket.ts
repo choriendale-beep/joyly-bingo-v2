@@ -17,6 +17,7 @@ export interface PlayerSocketInfo {
 export interface WinnerInfo {
   winnerName: string;
   username?: string;
+  winnerSocketId?: string;
   cartel: any;
   ticketNumber?: number;
   prize: number;
@@ -130,6 +131,8 @@ class BingoGameManager {
   public gameId: string = 'DB' + Math.random().toString(36).substring(2, 8).toUpperCase();
   public players: Map<string, PlayerSocketInfo> = new Map();
   public winnerInfo: WinnerInfo | null = null;
+  public lockedPlayersCount: number = 0;
+  public lockedDerash: number = 0;
   private intervalTimer: NodeJS.Timeout | null = null;
 
   constructor(io: SocketIOServer) {
@@ -138,20 +141,34 @@ class BingoGameManager {
   }
 
   public getRealPlayersCount(): number {
-    return Array.from(this.players.values()).filter(
-      (p) => p.selectedTickets && p.selectedTickets.length > 0
-    ).length;
+    if ((this.phase === 'PLAYING' || this.phase === 'WINNER_SHOW') && this.lockedPlayersCount > 0) {
+      return this.lockedPlayersCount;
+    }
+    const ticketSockets = new Set<string>();
+    this.players.forEach((p, socketId) => {
+      if (p.selectedTickets && p.selectedTickets.length > 0) {
+        ticketSockets.add(socketId);
+      }
+    });
+
+    if (ticketSockets.size > 0) {
+      return ticketSockets.size;
+    }
+    return Math.max(1, this.players.size);
   }
 
   public getTotalStakedTickets(): number {
     let total = 0;
     this.players.forEach((p) => {
-      total += (p.selectedTickets ? p.selectedTickets.length : 0);
+      total += p.selectedTickets ? p.selectedTickets.length : 0;
     });
     return total;
   }
 
   public getCalculateDerash(): number {
+    if ((this.phase === 'PLAYING' || this.phase === 'WINNER_SHOW') && this.lockedDerash > 0) {
+      return this.lockedDerash;
+    }
     let derashTotal = 0;
     this.players.forEach((p) => {
       const ticketCount = p.selectedTickets ? p.selectedTickets.length : 0;
@@ -180,6 +197,8 @@ class BingoGameManager {
     this.remainingBalls = [];
     this.currentBall = null;
     this.winnerInfo = null;
+    this.lockedPlayersCount = 0;
+    this.lockedDerash = 0;
     this.gameId = 'DB' + Math.random().toString(36).substring(2, 8).toUpperCase();
 
     // Reset selected tickets for all players when new game starts
@@ -235,6 +254,22 @@ class BingoGameManager {
     this.remainingBalls = generateStandardBalls();
     this.calledBalls = [];
     this.currentBall = null;
+
+    // Lock player count and derash prize pool accurately for the entire match
+    let totalDerash = 0;
+    const ticketSockets = new Set<string>();
+
+    this.players.forEach((p, sId) => {
+      if (p.selectedTickets && p.selectedTickets.length > 0) {
+        ticketSockets.add(sId);
+        const count = p.selectedTickets.length;
+        const stakeVal = p.stake || 10;
+        totalDerash += count * (stakeVal * 0.8);
+      }
+    });
+
+    this.lockedPlayersCount = Math.max(1, ticketSockets.size);
+    this.lockedDerash = Math.round(totalDerash * 100) / 100;
 
     this.broadcastRoomState();
     this.io.emit('game_start', {
@@ -303,6 +338,7 @@ class BingoGameManager {
     this.winnerInfo = {
       winnerName: winnerName,
       username: player.username || winnerName,
+      winnerSocketId: socketId,
       cartel: cartel,
       ticketNumber: ticketNum,
       prize: dynamicPrize,
@@ -310,7 +346,7 @@ class BingoGameManager {
     };
 
     // Save record to MongoDB
-    recordGameWin(this.gameId, this.winnerInfo.winnerName, this.winnerInfo.prize, this.getTotalStakedTickets()).catch((e) =>
+    recordGameWin(this.gameId, winnerName, dynamicPrize, this.getTotalStakedTickets()).catch((e) =>
       console.error('Error saving game win:', e)
     );
 
@@ -454,10 +490,24 @@ class BingoGameManager {
     });
 
     socket.on('select_tickets', (data: { username: string; selectedTickets: number[]; stake: number }) => {
+      // Find tickets already reserved by other players
+      const reservedByOthers = new Set<number>();
+      this.players.forEach((p, sId) => {
+        if (sId !== socket.id && p.selectedTickets && Array.isArray(p.selectedTickets)) {
+          p.selectedTickets.forEach((tNum) => reservedByOthers.add(tNum));
+        }
+      });
+
+      // Filter out tickets already taken by other players, and cap at max 6 tickets
+      const rawTickets = Array.isArray(data.selectedTickets) ? data.selectedTickets : [];
+      const validTickets = rawTickets
+        .filter((tNum) => typeof tNum === 'number' && !reservedByOthers.has(tNum))
+        .slice(0, 6);
+
       this.players.set(socket.id, {
         socketId: socket.id,
-        username: data.username,
-        selectedTickets: data.selectedTickets || [],
+        username: data.username || 'Player',
+        selectedTickets: validTickets,
         stake: data.stake || 10,
       });
 

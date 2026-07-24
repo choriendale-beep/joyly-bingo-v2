@@ -92,8 +92,8 @@ export function checkBingoWin(
 ): { isWin: boolean; pattern?: string } {
   const isCellMarked = (r: number, c: number) => {
     const cell = grid[r][c];
-    if (cell.number === 'FREE') return true;
-    return typeof cell.number === 'number' && (cell.daubed || calledNumbers.has(cell.number));
+    if ((cell.number as unknown) === 'FREE' || (cell.number as unknown) === 'free' || cell.number === 0) return true;
+    return typeof cell.number === 'number' && calledNumbers.has(cell.number);
   };
 
   // Horizontal Rows

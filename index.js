@@ -148,9 +148,10 @@ app.get('/api/users/:telegramId', async (req, res) => {
 });
 
 // GET leaderboard (Scores)
-app.get('/api/leaderboard', async (_req, res) => {
+app.get('/api/leaderboard', async (req, res) => {
   try {
-    const leaderboard = await getMongoDBLeaderboard();
+    const period = req.query.period || 'alltime';
+    const leaderboard = await getMongoDBLeaderboard(period);
     res.json({ success: true, leaderboard });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Failed to fetch leaderboard' });
