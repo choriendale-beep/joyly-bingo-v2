@@ -44,8 +44,7 @@ export function getStoredPlayer(): Player {
         telegram_id: tgUser?.id,
         username: tgUser?.username || 'real_player',
         first_name: tgUser?.first_name || 'Player',
-        mainWallet: 200,
-        playWallet: 50,
+        balance: 15,
         created_at: new Date().toISOString(),
         photo_url: tgUser?.photo_url || '',
       };
@@ -56,8 +55,7 @@ export function getStoredPlayer(): Player {
       telegram_id: tgUser?.id,
       username: tgUser?.username || 'real_player',
       first_name: tgUser?.first_name || 'Player',
-      mainWallet: 200,
-      playWallet: 50,
+      balance: 15,
       created_at: new Date().toISOString(),
       photo_url: tgUser?.photo_url || '',
     };
@@ -97,10 +95,10 @@ export function updateBalance(
   // Deposits do not credit the user's balance until an Admin approves them.
   // Withdrawals instantly deduct the balance so players cannot double-spend.
   const realAmountChange = type === 'deposit' ? 0 : amountChange;
-  const newMainWallet = Math.max(0, player.mainWallet + realAmountChange);
+  const newBalance = Math.max(0, player.balance + realAmountChange);
   const updatedPlayer: Player = {
     ...player,
-    mainWallet: newMainWallet,
+    balance: newBalance,
   };
 
   savePlayer(updatedPlayer);
@@ -260,7 +258,7 @@ export async function syncPlayerProfile(playerId: string): Promise<Player | null
       const local = getStoredPlayer();
       const synced: Player = {
         ...local,
-        mainWallet: data.user.balance !== undefined ? data.user.balance : local.mainWallet,
+        balance: data.user.balance !== undefined ? data.user.balance : local.balance,
         phone_number: data.user.phoneNumber !== undefined ? data.user.phoneNumber : local.phone_number,
         photo_url: data.user.photoUrl !== undefined ? data.user.photoUrl : local.photo_url,
       };

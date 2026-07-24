@@ -31,8 +31,7 @@ export const App: React.FC = () => {
     id: 'demo-player-1',
     username: 'lucky_player',
     first_name: 'Lucky',
-    mainWallet: 112,
-    playWallet: 0,
+    balance: 112,
     created_at: new Date().toISOString(),
   });
 
@@ -116,7 +115,7 @@ export const App: React.FC = () => {
     if (!targetTicket) return;
 
     if (!targetTicket.selected) {
-      if (player.mainWallet + player.playWallet < selectedStake) {
+      if (player.balance < selectedStake) {
         alert(`የቦርሳዎ ሂሳብ በቂ አይደለም! ቲኬት ለመምረጥ ${selectedStake} ETB ያስፈልጋል።`);
         return;
       }

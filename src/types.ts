@@ -7,8 +7,7 @@ export interface Player {
   telegram_id?: number;
   username?: string;
   first_name?: string;
-  mainWallet: number;
-  playWallet: number;
+  balance: number;
   created_at: string;
   photo_url?: string;
   phone_number?: string;

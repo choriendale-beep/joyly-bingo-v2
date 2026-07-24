@@ -28,18 +28,12 @@ export const PageWallet: React.FC<PageWalletProps> = ({
       </div>
 
       {/* Wallet Cards */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-[#181d30] border border-slate-800 rounded-2xl p-4 flex flex-col justify-between">
-          <span className="text-[10px] font-bold text-slate-400 uppercase">MAIN WALLET</span>
-          <div className="text-2xl font-black text-white my-1">{player.mainWallet} <span className="text-xs text-slate-400 font-normal">ETB</span></div>
-          <span className="text-[10px] text-slate-500">Withdrawable</span>
+      <div className="bg-[#181d30] border border-slate-800 rounded-2xl p-5 flex flex-col items-center justify-center text-center shadow-md relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+          <Wallet className="w-24 h-24 text-amber-500" />
         </div>
-
-        <div className="bg-[#181d30] border border-slate-800 rounded-2xl p-4 flex flex-col justify-between">
-          <span className="text-[10px] font-bold text-amber-400 uppercase">PLAY WALLET</span>
-          <div className="text-2xl font-black text-amber-400 my-1">{player.playWallet} <span className="text-xs text-amber-200 font-normal">ETB</span></div>
-          <span className="text-[10px] text-slate-500">Bonus Funds</span>
-        </div>
+        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1 relative z-10">TOTAL BALANCE</span>
+        <div className="text-4xl font-black text-white relative z-10">{player.balance} <span className="text-sm text-amber-400 font-bold ml-1">ETB</span></div>
       </div>
 
       {/* Action Buttons */}

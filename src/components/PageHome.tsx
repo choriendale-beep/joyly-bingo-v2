@@ -82,13 +82,10 @@ export const PageHome: React.FC<PageHomeProps> = ({
           {/* Wallet Balance Display */}
           <div className="text-center space-y-1 border-t border-slate-800/80 pt-4 w-full">
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              WALLET BALANCE
+              TOTAL BALANCE
             </div>
             <div className="text-3xl font-black text-white tracking-tight">
-              {player.mainWallet + player.playWallet} <span className="text-sm font-bold text-amber-400">ETB</span>
-            </div>
-            <div className="text-[11px] text-slate-400">
-              Main ({player.mainWallet}) + Play ({player.playWallet}) ETB
+              {player.balance} <span className="text-sm font-bold text-amber-400">ETB</span>
             </div>
           </div>
         </div>

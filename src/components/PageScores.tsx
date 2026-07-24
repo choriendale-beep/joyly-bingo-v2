@@ -51,8 +51,8 @@ export const PageScores: React.FC = () => {
             </div>
           </div>
           <div className="text-right">
-            <div className="text-xs font-bold text-slate-300">Main Balance</div>
-            <div className="text-sm font-black text-amber-400">{player.mainWallet} ETB</div>
+            <div className="text-xs font-bold text-slate-300">Balance</div>
+            <div className="text-sm font-black text-amber-400">{player.balance} ETB</div>
           </div>
         </div>
       )}

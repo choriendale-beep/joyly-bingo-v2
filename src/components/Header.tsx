@@ -46,7 +46,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div>
               <div className="text-[10px] text-slate-400 uppercase font-semibold leading-tight">Balance</div>
               <div className="text-sm font-bold text-amber-400 leading-tight">
-                {player.mainWallet + player.playWallet} <span className="text-xs font-normal text-amber-200">ETB</span>
+                {player.balance} <span className="text-xs font-normal text-amber-200">ETB</span>
               </div>
             </div>
           </div>

@@ -62,7 +62,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
               {type === 'deposit' ? 'Deposit Funds' : 'Withdraw Funds'}
             </h3>
             <p className="text-xs text-slate-400">
-              Main Wallet: <span className="text-amber-400 font-bold">{player.mainWallet} ETB</span>
+              Current Balance: <span className="text-amber-400 font-bold">{player.balance} ETB</span>
             </p>
           </div>
         </div>

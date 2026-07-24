@@ -94,7 +94,7 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
       <div className="grid grid-cols-4 gap-2 bg-[#181d30] border border-slate-800 p-2.5 rounded-2xl mb-3 text-center">
         <div className="bg-slate-900/65 p-1.5 rounded-xl border border-slate-800 flex flex-col justify-center">
           <div className="text-[9px] text-slate-400 font-semibold uppercase">WALLET</div>
-          <div className="text-[11px] font-bold text-slate-100 truncate">{player.mainWallet + player.playWallet} ETB</div>
+          <div className="text-[11px] font-bold text-slate-100 truncate">{player.balance} ETB</div>
         </div>
 
         <div className="bg-slate-900/65 p-1.5 rounded-xl border border-slate-800 flex flex-col justify-center">
