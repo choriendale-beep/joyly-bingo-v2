@@ -98,34 +98,31 @@ const inMemoryUsers = new Map<string, any>();
 const inMemoryTransactions = new Map<string, any[]>();
 const inMemoryHistory = new Map<string, any[]>();
 
-export async function seedInitialUsers() {
-  const defaultPlayers = [
-    { telegramId: 'tg_1001', name: 'Abebe', username: 'abebe_bingo', balance: 250, gamesPlayed: 12, gamesWon: 3, totalEarnings: 450 },
-    { telegramId: 'tg_1002', name: 'Kebede', username: 'kebede_pro', balance: 180, gamesPlayed: 10, gamesWon: 2, totalEarnings: 300 },
-    { telegramId: 'tg_1003', name: 'Tigist', username: 'tigist_lucky', balance: 320, gamesPlayed: 15, gamesWon: 5, totalEarnings: 680 },
-    { telegramId: 'tg_1004', name: 'Chala', username: 'chala_b', balance: 140, gamesPlayed: 8, gamesWon: 1, totalEarnings: 150 },
-    { telegramId: 'tg_1005', name: 'Almaz', username: 'almaz_star', balance: 210, gamesPlayed: 11, gamesWon: 3, totalEarnings: 380 },
-    { telegramId: 'tg_1006', name: 'Yonas', username: 'yonas_win', balance: 190, gamesPlayed: 9, gamesWon: 2, totalEarnings: 290 },
-  ];
-
+export async function deleteFakeAccounts() {
   if (isConnected) {
     try {
-      for (const p of defaultPlayers) {
-        await UserModel.updateOne(
-          { telegramId: p.telegramId },
-          { $setOnInsert: p },
-          { upsert: true }
-        );
-      }
-      console.log('[MongoDB] Initial users seeded successfully!');
+      const result = await UserModel.deleteMany({
+        $or: [
+          { phoneNumber: { $exists: false } },
+          { phoneNumber: null },
+          { phoneNumber: '' }
+        ]
+      });
+      console.log(`[MongoDB] Cleaned up ${result.deletedCount} fake/unregistered accounts without phone numbers.`);
     } catch (e) {
-      console.error('[MongoDB] Error seeding initial users:', e);
+      console.error('[MongoDB] Error in deleteFakeAccounts:', e);
     }
-  } else {
-    for (const p of defaultPlayers) {
-      if (!inMemoryUsers.has(p.telegramId)) {
-        inMemoryUsers.set(p.telegramId, { ...p, createdAt: new Date() });
-      }
+  }
+}
+
+export async function seedInitialUsers() {
+  // Disable seeding of default fake players entirely. We only want real registered accounts.
+  if (isConnected) {
+    try {
+      await deleteFakeAccounts();
+      console.log('[MongoDB] Running with real, verified registered accounts only.');
+    } catch (e) {
+      console.error('[MongoDB] Error during initial cleanup:', e);
     }
   }
 }
@@ -167,6 +164,18 @@ export async function connectMongoDB(): Promise<boolean> {
     await seedInitialUsers();
     return false;
   }
+}
+
+export async function getUserByTelegramId(telegramId: string) {
+  if (isConnected) {
+    try {
+      const user = await UserModel.findOne({ telegramId });
+      return user ? user.toObject() : null;
+    } catch (e) {
+      console.error('[MongoDB] Error in getUserByTelegramId:', e);
+    }
+  }
+  return inMemoryUsers.get(telegramId) || null;
 }
 
 export async function findOrCreateUser(telegramId: string, name: string, username?: string, phoneNumber?: string) {
@@ -266,12 +275,16 @@ export async function updateUserBalance(telegramId: string, amountChange: number
 export async function getUsersList() {
   if (isConnected) {
     try {
-      return await UserModel.find().sort({ balance: -1 }).limit(20).lean();
+      return await UserModel.find({
+        phoneNumber: { $exists: true, $nin: [null, ''] }
+      }).sort({ balance: -1 }).limit(20).lean();
     } catch (e) {
       console.error('[MongoDB] Error getting users list:', e);
     }
   }
-  return Array.from(inMemoryUsers.values());
+  return Array.from(inMemoryUsers.values()).filter(
+    (u) => u.phoneNumber && u.phoneNumber !== ''
+  );
 }
 
 export async function getUserProfile(telegramId: string) {
@@ -381,7 +394,9 @@ export async function getPlayerHistory(playerId: string) {
 export async function getMongoDBLeaderboard() {
   if (isConnected) {
     try {
-      const users = await UserModel.find().sort({ totalEarnings: -1 }).limit(20).lean();
+      const users = await UserModel.find({
+        phoneNumber: { $exists: true, $nin: [null, ''] }
+      }).sort({ totalEarnings: -1 }).limit(20).lean();
       return users.map((u, index) => ({
         id: u.telegramId,
         username: u.username || u.name || 'Player',
@@ -395,7 +410,9 @@ export async function getMongoDBLeaderboard() {
   }
 
   // Fallback based on inMemoryUsers
-  const list = Array.from(inMemoryUsers.values()) as any[];
+  const list = (Array.from(inMemoryUsers.values()) as any[]).filter(
+    (u) => u.phoneNumber && u.phoneNumber !== ''
+  );
   list.sort((a, b) => (b.totalEarnings || 0) - (a.totalEarnings || 0));
   return list.map((u, index) => ({
     id: u.telegramId,

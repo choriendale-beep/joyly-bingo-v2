@@ -1,6 +1,6 @@
 import { Telegraf, Markup } from 'telegraf';
 import { CONFIG } from './config';
-import { findOrCreateUser } from './db/mongodb';
+import { findOrCreateUser, getUserProfile } from './db/mongodb';
 
 let botInstance: Telegraf | null = null;
 
@@ -15,14 +15,33 @@ if (CONFIG.TELEGRAM_BOT_TOKEN) {
   console.log('[Telegram Bot] TELEGRAM_BOT_TOKEN not configured. Bot will run in inactive mode.');
 }
 
+async function getUserOrPromptRegistration(ctx: any) {
+  const telegramId = ctx.from?.id.toString();
+  if (!telegramId) return null;
+  const user = await getUserProfile(telegramId);
+  if (!user || !user.phoneNumber) {
+    const requestContactMsg = `🎲 <b>Welcome to LUCKY BINGO!</b> 🎲\n\n` +
+      `እንኳን ወደ <b>LUCKY BINGO</b> በደህና መጡ! ለመቀጠል እና ለመመዝገብ እባክዎ ከታች ያለውን <b>'📱 Share Contact / ስልክ ያጋሩ'</b> የሚለውን ቁልፍ ይጫኑ።\n\n` +
+      `To start playing and claim your registration bonus, please share your contact number using the button below.`;
+
+    await ctx.replyWithHTML(
+      requestContactMsg,
+      Markup.keyboard([
+        [Markup.button.contactRequest('📱 Share Contact / ስልክ ያጋሩ')]
+      ]).resize()
+    );
+    return null;
+  }
+  return user;
+}
+
 function setupBotHandlers(bot: Telegraf) {
   bot.command('start', async (ctx) => {
     const telegramId = ctx.from?.id.toString();
-    const name = ctx.from?.first_name || 'Player';
-    const username = ctx.from?.username;
+    if (!telegramId) return;
 
     // Check if user already exists
-    const user = await findOrCreateUser(telegramId, name, username);
+    const user = await getUserProfile(telegramId);
 
     const webAppUrl = process.env.TELEGRAM_WEBAPP_URL || 'https://joyly-bingo-v2.onrender.com';
 
@@ -63,12 +82,18 @@ function setupBotHandlers(bot: Telegraf) {
     const contact = ctx.message?.contact;
     if (!contact) return;
 
-    const telegramId = contact.user_id ? contact.user_id.toString() : ctx.from.id.toString();
+    // Verify contact actually belongs to the user clicking the button (prevents fake account registrations)
+    if (!contact.user_id || contact.user_id !== ctx.from.id) {
+      await ctx.replyWithHTML("❌ <b>እባክዎ የራስዎን ስልክ ቁጥር ያጋሩ!</b> / Please share your own phone number using the button below!");
+      return;
+    }
+
+    const telegramId = contact.user_id.toString();
     const name = contact.first_name + (contact.last_name ? ' ' + contact.last_name : '');
     const username = ctx.from?.username;
     const phoneNumber = contact.phone_number;
 
-    // Save/Register user in MongoDB
+    // Save/Register user in MongoDB ONLY when we have verified phone number
     const user = await findOrCreateUser(telegramId, name, username, phoneNumber);
 
     const webAppUrl = process.env.TELEGRAM_WEBAPP_URL || 'https://joyly-bingo-v2.onrender.com';
@@ -93,10 +118,9 @@ function setupBotHandlers(bot: Telegraf) {
   });
 
   bot.hears('Balance 💵', async (ctx) => {
-    const telegramId = ctx.from?.id.toString();
-    const name = ctx.from?.first_name || 'Player';
-    const username = ctx.from?.username;
-    const user = await findOrCreateUser(telegramId, name, username);
+    const user = await getUserOrPromptRegistration(ctx);
+    if (!user) return;
+
     await ctx.replyWithHTML(
       `💵 <b>Your Wallet Balance</b>\n\n` +
       `💰 Total Balance: <b>${user.balance} ETB</b>\n` +
@@ -106,6 +130,9 @@ function setupBotHandlers(bot: Telegraf) {
   });
 
   bot.hears('Deposit 💰', async (ctx) => {
+    const user = await getUserOrPromptRegistration(ctx);
+    if (!user) return;
+
     await ctx.replyWithHTML(
       `💳 <b>Deposit Funds — ዴፖዚት ለማድረግ</b>\n\n` +
       `ገንዘብ ዴፖዚት ለማድረግ እባክዎ ከታች ያሉትን የክፍያ አማራጮች በመጠቀም ይላኩና ክፍያ የፈጸሙበትን ደረሰኝ (Screenshot) ለሳፖርት @luckybingo_support ይላኩ።\n\n` +
@@ -118,6 +145,9 @@ function setupBotHandlers(bot: Telegraf) {
   });
 
   bot.hears('Contact Support...', async (ctx) => {
+    const user = await getUserOrPromptRegistration(ctx);
+    if (!user) return;
+
     await ctx.replyWithHTML(
       `📞 <b>Customer Support — የደንበኞች አገልግሎት</b>\n\n` +
       `ማንኛውም ጥያቄ ወይም እገዛ ሲፈልጉ የእኛን የደንበኞች አገልግሎት ማነጋገር ይችላሉ።\n\n` +
@@ -128,6 +158,9 @@ function setupBotHandlers(bot: Telegraf) {
   });
 
   bot.hears('Instruction 📖', async (ctx) => {
+    const user = await getUserOrPromptRegistration(ctx);
+    if (!user) return;
+
     await ctx.replyWithHTML(
       `📖 <b>How to Play LUCKY BINGO — ጨዋታውን ለመጫወት</b>\n\n` +
       `1. <b>Play 🎮</b> የሚለውን ቁልፍ በመንካት የLucky Bingo ዌብ መተግበሪያን ይክፈቱ።\n` +
@@ -139,6 +172,9 @@ function setupBotHandlers(bot: Telegraf) {
   });
 
   bot.hears('Transfer 🎁', async (ctx) => {
+    const user = await getUserOrPromptRegistration(ctx);
+    if (!user) return;
+
     await ctx.replyWithHTML(
       `🎁 <b>Balance Transfer — ሚዛን ማስተላለፍ</b>\n\n` +
       `የሂሳብ ሚዛንዎን ለሌላ ተጫዋች ማስተላለፍ ከፈለጉ እባክዎ በዌብ መተግበሪያው ውስጥ ያለውን 'Transfer' ገጽ ይጠቀሙ ወይም የደንበኞች አገልግሎትን ያነጋግሩ።\n\n` +
@@ -147,19 +183,21 @@ function setupBotHandlers(bot: Telegraf) {
   });
 
   bot.hears('Withdraw 🤑', async (ctx) => {
-    const telegramId = ctx.from?.id.toString();
-    const name = ctx.from?.first_name || 'Player';
-    const username = ctx.from?.username;
-    const user = await findOrCreateUser(telegramId, name, username);
+    const user = await getUserOrPromptRegistration(ctx);
+    if (!user) return;
+
     await ctx.replyWithHTML(
       `💸 <b>Withdrawal — ገንዘብ ለማውጣት</b>\n\n` +
-      `💰 ማውጣት የሚችሉት ሂሳብ (Available Balance): <b>${user.balance} ETB</b>\n` +
+      `💰 ማውጣት የሚስለውን ሂሳብ (Available Balance): <b>${user.balance} ETB</b>\n` +
       `⚠️ አነስተኛ ማውጫ መጠን (Minimum Withdrawal): <b>50 ETB</b>\n\n` +
       `ገንዘብ ለማውጣት እባክዎ በዌብ መተግበሪያው ውስጥ ያለውን 'Withdraw' ገጽ በመጠቀም ጥያቄዎን ያቅርቡ። በጥቂት ደቂቃዎች ውስጥ በTelebirr ይላክለታል።`
     );
   });
 
   bot.hears('Invite 🔗', async (ctx) => {
+    const user = await getUserOrPromptRegistration(ctx);
+    if (!user) return;
+
     const botName = ctx.botInfo?.username || 'luckybingo_bot';
     const referralLink = `https://t.me/${botName}?start=ref_${ctx.from?.id}`;
     await ctx.replyWithHTML(

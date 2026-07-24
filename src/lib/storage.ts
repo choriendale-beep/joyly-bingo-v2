@@ -24,15 +24,20 @@ export function getStoredPlayer(): Player {
   if (stored) {
     try {
       playerObj = JSON.parse(stored);
+      // Migration: if the cached ID starts with "tg-", clear it to load/save without the prefix
+      if (playerObj.id && playerObj.id.startsWith('tg-')) {
+        localStorage.removeItem(PLAYER_KEY);
+        throw new Error('Migrating user ID prefix');
+      }
       if (tgUser) {
         playerObj.username = tgUser.username || playerObj.username;
         playerObj.first_name = tgUser.first_name || playerObj.first_name;
         playerObj.telegram_id = tgUser.id;
-        playerObj.id = `tg-${tgUser.id}`;
+        playerObj.id = tgUser.id.toString();
       }
     } catch (e) {
       playerObj = {
-        id: tgUser ? `tg-${tgUser.id}` : 'player-real-1',
+        id: tgUser ? tgUser.id.toString() : 'player-real-1',
         telegram_id: tgUser?.id,
         username: tgUser?.username || 'real_player',
         first_name: tgUser?.first_name || 'Player',
@@ -43,7 +48,7 @@ export function getStoredPlayer(): Player {
     }
   } else {
     playerObj = {
-      id: tgUser ? `tg-${tgUser.id}` : 'player-real-1',
+      id: tgUser ? tgUser.id.toString() : 'player-real-1',
       telegram_id: tgUser?.id,
       username: tgUser?.username || 'real_player',
       first_name: tgUser?.first_name || 'Player',
