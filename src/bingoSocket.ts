@@ -16,7 +16,9 @@ export interface PlayerSocketInfo {
 
 export interface WinnerInfo {
   winnerName: string;
+  username?: string;
   cartel: any;
+  ticketNumber?: number;
   prize: number;
   pattern: string;
 }
@@ -126,11 +128,7 @@ class BingoGameManager {
         this.broadcastRoomState();
       } else {
         if (this.intervalTimer) clearInterval(this.intervalTimer);
-        if (this.getTotalStakedTickets() > 0) {
-          this.startPlayingPhase();
-        } else {
-          this.startSelectionPhase();
-        }
+        this.startPlayingPhase();
       }
     }, 1000);
   }
@@ -183,9 +181,14 @@ class BingoGameManager {
       return;
     }
 
+    const winnerName = claimData.username || player.username || 'Player';
+    const ticketNum = claimData.cartel?.ticketNumber || claimData.cartel?.id || 1;
+
     this.winnerInfo = {
-      winnerName: claimData.username || player.username || 'You',
+      winnerName: winnerName,
+      username: player.username || winnerName,
       cartel: claimData.cartel,
+      ticketNumber: ticketNum,
       prize: this.getCalculateDerash(),
       pattern: claimData.pattern || 'BINGO',
     };
@@ -198,19 +201,29 @@ class BingoGameManager {
     this.phase = 'WINNER_SHOW';
     if (this.intervalTimer) clearInterval(this.intervalTimer);
 
+    // Broadcast winner events to all connected clients
     this.io.emit('game_over', {
       winnerInfo: this.winnerInfo,
       gameId: this.gameId,
     });
+    this.io.emit('winner_announced', {
+      winnerInfo: this.winnerInfo,
+      gameId: this.gameId,
+    });
+
+    this.broadcastRoomState();
 
     // 5 seconds winner display before returning to ticket selection for everyone
     setTimeout(() => {
       this.startSelectionPhase();
+      this.io.emit('reset_to_lobby', {
+        gameId: this.gameId,
+      });
     }, 5000);
   }
 
   public broadcastRoomState() {
-    this.io.emit('room_state', {
+    const payload = {
       phase: this.phase,
       timerSeconds: this.timerSeconds,
       playersCount: this.getRealPlayersCount(),
@@ -221,14 +234,17 @@ class BingoGameManager {
       currentBall: this.currentBall,
       reservedTickets: this.getReservedTicketsMap(),
       winnerInfo: this.winnerInfo,
-    });
+    };
+
+    this.io.emit('room_state', payload);
+    this.io.emit('game_state_update', payload);
   }
 
   public handleConnection(socket: Socket) {
     console.log(`[Socket.IO] Client connected: ${socket.id}`);
 
-    // Send initial room state to newly connected client
-    socket.emit('room_state', {
+    // Initial state sent to newly connected client
+    const initialPayload = {
       phase: this.phase,
       timerSeconds: this.timerSeconds,
       playersCount: this.getRealPlayersCount(),
@@ -239,27 +255,40 @@ class BingoGameManager {
       currentBall: this.currentBall,
       reservedTickets: this.getReservedTicketsMap(),
       winnerInfo: this.winnerInfo,
-    });
+    };
 
-    socket.on('join_game', (data: { username: string; selectedTickets: number[]; stake: number }) => {
-      if (!data.selectedTickets || !Array.isArray(data.selectedTickets) || data.selectedTickets.length === 0) {
-        socket.emit('error_message', { message: 'ወደ ጨዋታው ለመግባት ቢያንስ 1 ቲኬት መግዛት አለብዎት!' });
-        return;
-      }
+    socket.emit('room_state', initialPayload);
+    socket.emit('game_state_update', initialPayload);
+
+    const handleJoin = (data: { username?: string; selectedTickets?: number[]; stake?: number }) => {
+      const ticketsList = Array.isArray(data?.selectedTickets) ? data.selectedTickets : [];
 
       this.players.set(socket.id, {
         socketId: socket.id,
-        username: data.username || 'Player',
-        selectedTickets: data.selectedTickets,
-        stake: data.stake || 10,
+        username: data?.username || 'Player',
+        selectedTickets: ticketsList,
+        stake: data?.stake || 10,
       });
 
-      if (data.username) {
+      if (data?.username) {
         findOrCreateUser(socket.id, data.username, data.username).catch((e) =>
           console.error('Error finding/creating user in MongoDB:', e)
         );
       }
 
+      this.broadcastRoomState();
+    };
+
+    socket.on('join_game', handleJoin);
+    socket.on('join_room', handleJoin);
+
+    socket.on('spectate_game', (data: { username?: string }) => {
+      this.players.set(socket.id, {
+        socketId: socket.id,
+        username: data?.username || 'Spectator',
+        selectedTickets: [],
+        stake: 10,
+      });
       this.broadcastRoomState();
     });
 

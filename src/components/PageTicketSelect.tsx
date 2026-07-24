@@ -38,6 +38,21 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
     emitSelectTickets(myName, selectedNums, stake);
   }, [tickets, player, stake]);
 
+  // Local fallback 35-second timer countdown
+  useEffect(() => {
+    const timerInterval = setInterval(() => {
+      setTimerSeconds((prev) => {
+        if (prev <= 1) {
+          onTimerExpired();
+          return 35;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timerInterval);
+  }, [onTimerExpired]);
+
   // Listen to Socket.IO real-time room updates
   useEffect(() => {
     const handleRoomState = (state: RoomState) => {

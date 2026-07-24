@@ -32,8 +32,21 @@ export function emitSelectTickets(username: string, selectedTickets: number[], s
 }
 
 export function emitJoinGame(username: string, selectedTickets: number[], stake: number) {
-  if (socket.connected && selectedTickets && selectedTickets.length > 0) {
-    socket.emit('join_game', { username, selectedTickets, stake });
+  if (socket.connected) {
+    socket.emit('join_game', { username, selectedTickets: selectedTickets || [], stake });
+    socket.emit('join_room', { username, selectedTickets: selectedTickets || [], stake });
+  }
+}
+
+export function emitJoinRoom(username: string, selectedTickets: number[], stake: number) {
+  if (socket.connected) {
+    socket.emit('join_room', { username, selectedTickets: selectedTickets || [], stake });
+  }
+}
+
+export function emitSpectateGame(username: string) {
+  if (socket.connected) {
+    socket.emit('spectate_game', { username });
   }
 }
 

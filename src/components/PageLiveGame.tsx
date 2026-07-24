@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TicketItem, CalledBall, Cartel, Player } from '../types';
 import { checkBingoWin } from '../lib/bingo';
-import { Volume2, VolumeX, RefreshCw, LogOut, CheckCircle2, Crown } from 'lucide-react';
-import { socket, emitClaimBingo, emitJoinGame, RoomState } from '../lib/socket';
+import { Volume2, VolumeX, RefreshCw, LogOut, CheckCircle2, Crown, Eye } from 'lucide-react';
+import { socket, emitClaimBingo, emitJoinGame, emitSpectateGame, RoomState } from '../lib/socket';
 
 interface PageLiveGameProps {
   player: Player;
@@ -25,6 +25,7 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
   soundEnabled,
   setSoundEnabled,
 }) => {
+  const isSpectator = selectedTickets.length === 0;
   const [isAutomatic, setIsAutomatic] = useState<boolean>(true);
   const [calledBalls, setCalledBalls] = useState<CalledBall[]>([]);
   const [currentBall, setCurrentBall] = useState<CalledBall | null>(null);
@@ -33,7 +34,9 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
   );
   const [winningInfo, setWinningInfo] = useState<{
     winnerName: string;
+    username?: string;
     cartel: Cartel;
+    ticketNumber?: number;
     prize: number;
     pattern: string;
   } | null>(null);
@@ -82,8 +85,8 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
       if (data.calledBalls) {
         setCalledBalls(data.calledBalls);
 
-        // Auto-daub active cartels
-        if (isAutomatic && data.currentBall) {
+        // Auto-daub active cartels for ticket holders
+        if (isAutomatic && data.currentBall && activeCartels.length > 0) {
           const ballNum = data.currentBall.number;
           setActiveCartels((prevCartels) =>
             prevCartels.map((cartel) => {
@@ -106,10 +109,19 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
       if (data.winnerInfo) {
         setWinningInfo({
           winnerName: data.winnerInfo.winnerName,
-          cartel: data.winnerInfo.cartel || activeCartels[0],
+          username: data.winnerInfo.username,
+          cartel: data.winnerInfo.cartel || activeCartels[0] || { grid: [], ticketNumber: 1 },
+          ticketNumber: data.winnerInfo.ticketNumber || data.winnerInfo.cartel?.ticketNumber,
           prize: data.winnerInfo.prize || derash,
           pattern: data.winnerInfo.pattern || 'BINGO',
         });
+      }
+    };
+
+    const handleResetToLobby = () => {
+      if (!leaveGameHandledRef.current) {
+        leaveGameHandledRef.current = true;
+        onLeaveGame();
       }
     };
 
@@ -122,7 +134,7 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
       }
       if (state.calledBalls && state.calledBalls.length > 0) {
         setCalledBalls(state.calledBalls);
-        if (isAutomatic) {
+        if (isAutomatic && activeCartels.length > 0) {
           const calledNums = new Set(state.calledBalls.map((b) => b.number));
           setActiveCartels((prevCartels) =>
             prevCartels.map((cartel) => {
@@ -145,28 +157,42 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
       if (state.winnerInfo) {
         setWinningInfo(state.winnerInfo);
       } else if (state.phase === 'TICKET_SELECT') {
-        setWinningInfo(null);
+        if (!leaveGameHandledRef.current) {
+          leaveGameHandledRef.current = true;
+          onLeaveGame();
+        }
       }
     };
 
     socket.on('ball_called', handleBallCalled);
     socket.on('game_over', handleGameOver);
+    socket.on('winner_announced', handleGameOver);
+    socket.on('game_state_update', handleRoomState);
     socket.on('room_state', handleRoomState);
+    socket.on('reset_to_lobby', handleResetToLobby);
 
-    // Emit join_game with selected tickets to validate on server before play
-    const ticketNumbers = selectedTickets.map((t) => t.number);
-    emitJoinGame(player.first_name || player.username || 'Player', ticketNumbers, stake);
+    // Emit join_game or spectate_game
+    const usernameStr = player.first_name || player.username || 'Player';
+    if (selectedTickets.length > 0) {
+      const ticketNumbers = selectedTickets.map((t) => t.number);
+      emitJoinGame(usernameStr, ticketNumbers, stake);
+    } else {
+      emitSpectateGame(usernameStr);
+    }
 
     return () => {
       socket.off('ball_called', handleBallCalled);
       socket.off('game_over', handleGameOver);
+      socket.off('winner_announced', handleGameOver);
+      socket.off('game_state_update', handleRoomState);
       socket.off('room_state', handleRoomState);
+      socket.off('reset_to_lobby', handleResetToLobby);
     };
-  }, [isAutomatic, activeCartels, derash]);
+  }, [isAutomatic, activeCartels, derash, selectedTickets, player, stake, onLeaveGame]);
 
   // Check win condition locally and broadcast to socket
   useEffect(() => {
-    if (winningInfo || winHandledRef.current) return;
+    if (isSpectator || winningInfo || winHandledRef.current) return;
 
     const calledNums = new Set(calledBalls.map((b) => b.number));
     for (const cartel of activeCartels) {
@@ -176,7 +202,9 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
         const winnerName = player.first_name || player.username || 'You';
         setWinningInfo({
           winnerName,
+          username: player.username,
           cartel,
+          ticketNumber: cartel.ticketNumber,
           prize: derash,
           pattern: winRes.pattern || 'BINGO',
         });
@@ -185,7 +213,7 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
         break;
       }
     }
-  }, [calledBalls, activeCartels, winningInfo, derash, onWin, player]);
+  }, [calledBalls, activeCartels, winningInfo, derash, onWin, player, isSpectator]);
 
   // Winner 5-Second Countdown Timer
   useEffect(() => {
@@ -210,6 +238,7 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
 
   // Manual daub click handler
   const handleCellClick = (cartelIndex: number, rIdx: number, cIdx: number) => {
+    if (isSpectator) return;
     playBeep(650);
     setActiveCartels((prev) =>
       prev.map((c, i) => {
@@ -240,6 +269,19 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
 
   return (
     <div className="flex-1 flex flex-col max-w-md mx-auto w-full px-2 pt-2 pb-20 text-white">
+      {/* Spectator Mode Banner */}
+      {isSpectator && (
+        <div className="flex items-center justify-between bg-sky-950/70 border border-sky-800/80 px-3 py-2 rounded-2xl text-sky-300 text-xs font-bold mb-2 shadow-lg backdrop-blur-sm">
+          <div className="flex items-center gap-2">
+            <Eye className="w-4 h-4 text-sky-400 animate-pulse" />
+            <span>Spectating Live Match / ተመልካች</span>
+          </div>
+          <span className="text-[10px] uppercase tracking-wider text-sky-400/90 font-mono bg-sky-900/60 px-2 py-0.5 rounded-full border border-sky-700/50">
+            Observer
+          </span>
+        </div>
+      )}
+
       {/* Top Stats Bar */}
       <div className="grid grid-cols-5 gap-1 bg-[#181d30] border border-slate-800 p-2 rounded-2xl mb-2 text-center">
         <div className="bg-slate-900/80 p-1 rounded-xl">
@@ -348,6 +390,19 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
             </div>
           </div>
 
+          {/* Spectator Card when no tickets are selected */}
+          {activeCartels.length === 0 && (
+            <div className="bg-[#181d30] border border-slate-800 rounded-2xl p-4 text-center space-y-1.5 shadow-md shrink-0">
+              <div className="text-xs font-bold text-sky-400 flex items-center justify-center gap-1.5">
+                <span>👀</span>
+                <span>ተመልካች (Spectator Mode)</span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                ካርቴላ አልመረጡም። የወጡትን ቁጥሮችና የጨዋታውን ሂደት በቀጥታ መከታተል ይችላሉ!
+              </p>
+            </div>
+          )}
+
           {/* ALL Selected Cartels Display (White Cartel Card with colorful B-I-N-G-O header) */}
           {activeCartels.map((cartel, cartelIdx) => (
             <div
@@ -432,87 +487,94 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
         </button>
       </div>
 
-      {/* WINNER ANNOUNCEMENT MODAL (Matching Photo 5 EXACTLY) */}
+      {/* Mandatory Winner Announcement Modal (5-second auto redirect to lobby, NO close/back buttons) */}
       {winningInfo && (
-        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-[#121624] border border-slate-800 rounded-3xl w-full max-w-sm p-5 shadow-2xl flex flex-col items-center gap-3 relative text-center">
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-[#121624] border border-amber-500/40 rounded-3xl w-full max-w-sm p-5 shadow-2xl flex flex-col items-center gap-3 relative text-center">
             {/* Crown Icon */}
-            <div className="p-3 bg-amber-500/20 text-amber-400 rounded-2xl">
+            <div className="p-3 bg-amber-500/20 text-amber-400 rounded-2xl border border-amber-500/30">
               <Crown className="w-10 h-10 text-amber-400 fill-amber-400 animate-bounce" />
             </div>
 
-            {/* Header Title */}
+            {/* Winner Details */}
             <div>
               <h2 className="text-2xl font-black text-amber-400 uppercase tracking-wide">
-                🎉 BINGO! 🎉
+                🎉 BINGO WINNER! 🎉
               </h2>
               <p className="text-lg font-black text-white mt-0.5">
-                {winningInfo.winnerName} Won!
+                {winningInfo.winnerName}
               </p>
-              <p className="text-xs font-bold text-amber-400/90 tracking-widest mt-1 uppercase">
-                CARTEL NO #{winningInfo.cartel.ticketNumber}
+              {winningInfo.username && (
+                <p className="text-xs font-semibold text-slate-400">
+                  @{winningInfo.username}
+                </p>
+              )}
+              <div className="inline-flex items-center gap-2 mt-2 px-3 py-1 bg-amber-500/20 rounded-full border border-amber-500/40">
+                <span className="text-xs font-bold text-amber-300">
+                  Prize Won: <span className="text-sm font-black text-amber-400">{winningInfo.prize} ETB</span>
+                </span>
+              </div>
+              <p className="text-xs font-bold text-slate-300 tracking-widest mt-2 uppercase">
+                CARTEL #{winningInfo.cartel?.ticketNumber || winningInfo.ticketNumber || 1}
               </p>
             </div>
 
             {/* Winning Cartel Board Card */}
-            <div className="w-full max-w-[240px] bg-white border border-slate-200 p-2.5 rounded-2xl shadow-xl">
-              <div className="grid grid-cols-5 gap-1">
-                {['B', 'I', 'N', 'G', 'O'].map((letter, idx) => (
-                  <div
-                    key={letter}
-                    className={`${headerColors[idx]} font-black text-center py-1 text-xs rounded uppercase shadow`}
-                  >
-                    {letter}
-                  </div>
-                ))}
-                {winningInfo.cartel.grid.map((row, rIdx) =>
-                  row.map((cell, cIdx) => {
-                    const isFree = cell.number === 'FREE';
-                    const numVal = isFree ? 0 : (cell.number as number);
-                    const isCalled = !isFree && calledSet.has(numVal);
-                    const isDaubed = cell.daubed || isCalled;
+            {winningInfo.cartel?.grid && (
+              <div className="w-full max-w-[220px] bg-white border border-slate-200 p-2.5 rounded-2xl shadow-xl">
+                <div className="grid grid-cols-5 gap-1 mb-1">
+                  {['B', 'I', 'N', 'G', 'O'].map((letter, idx) => (
+                    <div
+                      key={letter}
+                      className={`${headerColors[idx]} font-black text-center py-0.5 text-[10px] rounded uppercase shadow-sm`}
+                    >
+                      {letter}
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-5 gap-1">
+                  {winningInfo.cartel.grid.map((row, rIdx) =>
+                    row.map((cell, cIdx) => {
+                      const isFree = cell.number === 'FREE';
+                      const numVal = isFree ? 0 : (cell.number as number);
+                      const isCalled = !isFree && calledSet.has(numVal);
+                      const isDaubed = cell.daubed || isCalled;
 
-                    return (
-                      <div
-                        key={`${rIdx}-${cIdx}`}
-                        className={`
-                          aspect-square rounded flex items-center justify-center font-black text-xs transition-all shadow-sm border
-                          ${
-                            isFree
-                              ? 'bg-teal-500 text-white border-teal-600'
-                              : isDaubed
-                              ? 'bg-orange-500 text-white border-orange-600'
-                              : 'bg-slate-100 text-slate-900 border-slate-200'
-                          }
-                        `}
-                      >
-                        {isFree ? '★' : cell.number}
-                      </div>
-                    );
-                  })
-                )}
+                      return (
+                        <div
+                          key={`${rIdx}-${cIdx}`}
+                          className={`
+                            aspect-square rounded flex items-center justify-center font-black text-[10px] transition-all shadow-sm border
+                            ${
+                              isFree
+                                ? 'bg-teal-500 text-white border-teal-600'
+                                : isDaubed
+                                ? 'bg-amber-500 text-slate-950 border-amber-600'
+                                : 'bg-slate-100 text-slate-900 border-slate-200'
+                            }
+                          `}
+                        >
+                          {isFree ? '★' : cell.number}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* 5-Second Bar Timer Countdown */}
+            {/* 5-Second Countdown (NO Back/Continue/Close buttons permitted) */}
             <div className="w-full space-y-1.5 pt-2">
-              <div className="text-[11px] font-bold text-slate-400 tracking-wider uppercase">
-                STARTING IN {winnerTimer}S
+              <div className="text-[11px] font-bold text-amber-300 tracking-wider uppercase">
+                REDIRECTING TO LOBBY IN {winnerTimer}S
               </div>
-              <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+              <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
                 <div
-                  className="bg-amber-500 h-full transition-all duration-1000 ease-linear"
+                  className="bg-amber-500 h-full transition-all duration-1000 ease-linear rounded-full"
                   style={{ width: `${(winnerTimer / 5) * 100}%` }}
                 />
               </div>
             </div>
-
-            <button
-              onClick={onLeaveGame}
-              className="w-full mt-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3 rounded-xl text-xs cursor-pointer transition uppercase"
-            >
-              Back to Ticket Selection
-            </button>
           </div>
         </div>
       )}

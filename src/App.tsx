@@ -90,10 +90,7 @@ export const App: React.FC = () => {
         setTickets((prev) => prev.map((t) => ({ ...t, selected: false })));
       }
       if (state.phase === 'PLAYING' && activeTab === 'GAME' && gameStage === 'TICKET_SELECT') {
-        const selected = ticketsRef.current.filter((t) => t.selected);
-        if (selected.length > 0) {
-          handleStartLiveGame();
-        }
+        handleStartLiveGame();
       } else if (state.phase === 'TICKET_SELECT') {
         alertShownRef.current = false;
         if (gameStage === 'PLAYING') {
@@ -102,10 +99,19 @@ export const App: React.FC = () => {
       }
     };
 
+    const handleResetToLobby = () => {
+      setGameStage('TICKET_SELECT');
+      setTickets((prev) => prev.map((t) => ({ ...t, selected: false })));
+    };
+
     socket.on('room_state', handleRoomState);
+    socket.on('game_state_update', handleRoomState);
+    socket.on('reset_to_lobby', handleResetToLobby);
 
     return () => {
       socket.off('room_state', handleRoomState);
+      socket.off('game_state_update', handleRoomState);
+      socket.off('reset_to_lobby', handleResetToLobby);
     };
   }, [activeTab, gameStage, gameId]);
 
@@ -162,13 +168,6 @@ export const App: React.FC = () => {
   // Transition from Ticket Selection -> Live Game
   const handleStartLiveGame = async () => {
     const selected = tickets.filter((t) => t.selected);
-    
-    // Strict requirement: User MUST select at least 1 ticket to enter game!
-    if (selected.length === 0) {
-      alert('እባክዎ ወደ ጨዋታው ከመግባትዎ በፊት ቢያንስ 1 ቲኬት (ካርቴላ) ይምረጡ!');
-      return;
-    }
-
     const count = selected.length;
     const totalCost = count * selectedStake;
 
@@ -176,16 +175,18 @@ export const App: React.FC = () => {
     const randomGameId = 'DB' + Math.random().toString(36).substring(2, 8).toUpperCase();
     setGameId(randomGameId);
 
-    // Record initial match history entry
-    addGameHistory({
-      id: `gh-${Date.now()}`,
-      gameId: randomGameId,
-      date: 'Just now',
-      stake: totalCost,
-      ticketsCount: count,
-      potWon: 0,
-      status: 'LOST',
-    });
+    // Record initial match history entry if user bought tickets
+    if (count > 0) {
+      addGameHistory({
+        id: `gh-${Date.now()}`,
+        gameId: randomGameId,
+        date: 'Just now',
+        stake: totalCost,
+        ticketsCount: count,
+        potWon: 0,
+        status: 'LOST',
+      });
+    }
 
     setGameStage('PLAYING');
   };
@@ -278,7 +279,7 @@ export const App: React.FC = () => {
               player={player}
               gameId={gameId}
               stake={selectedStake}
-              selectedTickets={selectedTicketsList.length > 0 ? selectedTicketsList : [tickets[0]]}
+              selectedTickets={selectedTicketsList}
               onLeaveGame={() => {
                 setTickets((prev) => prev.map((t) => ({ ...t, selected: false })));
                 setGameStage('HOME');
