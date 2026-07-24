@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer } from 'vite';
-import { setupBingoSocket } from './src/bingoSocket';
+import { setupBingoSocket } from './src/bingoSocket.js';
 import {
   connectMongoDB,
   getUsersList,
@@ -20,7 +20,7 @@ import {
   savePlayerHistory,
   getPlayerHistory,
   getMongoDBLeaderboard
-} from './src/db/mongodb';
+} from './src/db/mongodb.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

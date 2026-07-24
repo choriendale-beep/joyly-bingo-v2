@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx index.js",
     "build": "vite build",
-    "start": "node --max-old-space-size=512 index.js",
+    "start": "tsx --max-old-space-size=512 index.js",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit"
   },
