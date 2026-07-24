@@ -10,6 +10,7 @@ import { PageScores } from './components/PageScores';
 import { PageHistory } from './components/PageHistory';
 import { PageWallet } from './components/PageWallet';
 import { PageProfile } from './components/PageProfile';
+import { PageAdmin } from './components/PageAdmin';
 import { WalletModal } from './components/WalletModal';
 import { TransactionsModal } from './components/TransactionsModal';
 import { RulesModal } from './components/RulesModal';
@@ -298,6 +299,8 @@ export const App: React.FC = () => {
       )}
 
       {activeTab === 'PROFILE' && <PageProfile player={player} />}
+
+      {activeTab === 'ADMIN' && <PageAdmin />}
 
       {/* Bottom Navigation Bar across all views */}
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} botHandle="@dilbingo_bot" />

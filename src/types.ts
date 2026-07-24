@@ -1,4 +1,4 @@
-export type NavTab = 'GAME' | 'SCORES' | 'HISTORY' | 'WALLET' | 'PROFILE';
+export type NavTab = 'GAME' | 'SCORES' | 'HISTORY' | 'WALLET' | 'PROFILE' | 'ADMIN';
 
 export type GameStage = 'HOME' | 'TICKET_SELECT' | 'PLAYING' | 'RESULT';
 

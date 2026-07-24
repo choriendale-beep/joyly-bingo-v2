@@ -86,7 +86,11 @@ export function updateBalance(
   description?: string
 ): Player {
   const player = getStoredPlayer();
-  const newMainWallet = Math.max(0, player.mainWallet + amountChange);
+  const isPendingType = type === 'deposit' || type === 'withdrawal';
+  // Deposits do not credit the user's balance until an Admin approves them.
+  // Withdrawals instantly deduct the balance so players cannot double-spend.
+  const realAmountChange = type === 'deposit' ? 0 : amountChange;
+  const newMainWallet = Math.max(0, player.mainWallet + realAmountChange);
   const updatedPlayer: Player = {
     ...player,
     mainWallet: newMainWallet,
@@ -95,16 +99,18 @@ export function updateBalance(
   savePlayer(updatedPlayer);
 
   // Sync balance update with backend
-  try {
-    fetch('/api/users/balance', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        telegramId: player.id,
-        amountChange,
-      }),
-    }).catch(() => {});
-  } catch (e) {}
+  if (realAmountChange !== 0) {
+    try {
+      fetch('/api/users/balance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegramId: player.id,
+          amountChange: realAmountChange,
+        }),
+      }).catch(() => {});
+    } catch (e) {}
+  }
 
   // Add transaction
   const newTx: Transaction = {
@@ -112,7 +118,7 @@ export function updateBalance(
     playerId: player.id,
     type,
     amount: amountChange,
-    status: 'completed',
+    status: isPendingType ? 'pending' : 'completed',
     createdAt: new Date().toISOString(),
     description,
   };

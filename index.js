@@ -25,7 +25,11 @@ import {
   getPlayerTransactions,
   savePlayerHistory,
   getPlayerHistory,
-  getMongoDBLeaderboard
+  getMongoDBLeaderboard,
+  getAllUsersForAdmin,
+  adminUpdateUser,
+  adminGetTransactions,
+  adminUpdateTransaction
 } from './src/db/mongodb.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -175,6 +179,77 @@ app.post('/api/transactions', async (req, res) => {
     res.json({ success: true, transaction: saved });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Failed to save transaction' });
+  }
+});
+
+// Admin portal API routes
+app.get('/api/admin/users', async (_req, res) => {
+  try {
+    const users = await getAllUsersForAdmin();
+    res.json({ success: true, users });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to fetch admin users' });
+  }
+});
+
+app.post('/api/admin/users/update', async (req, res) => {
+  try {
+    const { telegramId, isBanned, balance } = req.body;
+    const updateData = {};
+    if (isBanned !== undefined) updateData.isBanned = isBanned;
+    if (balance !== undefined) updateData.balance = Number(balance);
+
+    const updated = await adminUpdateUser(telegramId, updateData);
+    if (!updated) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    res.json({ success: true, user: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to update user' });
+  }
+});
+
+app.get('/api/admin/transactions', async (_req, res) => {
+  try {
+    const transactions = await adminGetTransactions();
+    res.json({ success: true, transactions });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to fetch admin transactions' });
+  }
+});
+
+app.post('/api/admin/transactions/update', async (req, res) => {
+  try {
+    const { id, status } = req.body;
+    if (!id || !status) {
+      return res.status(400).json({ success: false, error: 'Transaction id and status required' });
+    }
+
+    const txs = await adminGetTransactions();
+    const tx = txs.find((t) => t.id === id);
+    if (!tx) {
+      return res.status(404).json({ success: false, error: 'Transaction not found' });
+    }
+
+    if (tx.status !== 'pending') {
+      return res.status(400).json({ success: false, error: 'Transaction already processed' });
+    }
+
+    const updatedTx = await adminUpdateTransaction(id, status);
+
+    // If approved deposit, add funds to player's balance
+    if (status === 'completed' && tx.type === 'deposit') {
+      await updateUserBalance(tx.playerId, Number(tx.amount));
+    }
+
+    // If rejected withdrawal, refund the funds back to user's balance
+    if (status === 'rejected' && tx.type === 'withdrawal') {
+      await updateUserBalance(tx.playerId, Math.abs(Number(tx.amount)));
+    }
+
+    res.json({ success: true, transaction: updatedTx });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to update transaction status' });
   }
 });
 

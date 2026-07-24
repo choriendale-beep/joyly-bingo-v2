@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavTab } from '../types';
-import { Gamepad2, Trophy, Clock, Wallet, User } from 'lucide-react';
+import { Gamepad2, Trophy, Clock, Wallet, User, Shield } from 'lucide-react';
 
 interface BottomNavProps {
   activeTab: NavTab;
@@ -19,6 +19,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     { id: 'HISTORY' as NavTab, label: 'HISTORY', icon: Clock },
     { id: 'WALLET' as NavTab, label: 'WALLET', icon: Wallet },
     { id: 'PROFILE' as NavTab, label: 'PROFILE', icon: User },
+    { id: 'ADMIN' as NavTab, label: 'ADMIN', icon: Shield },
   ];
 
   return (

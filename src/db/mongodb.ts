@@ -10,6 +10,8 @@ export interface IUser extends Document {
   gamesWon: number;
   totalEarnings: number;
   createdAt: Date;
+  photoUrl?: string;
+  isBanned?: boolean;
 }
 
 export interface IGameHistory extends Document {
@@ -53,6 +55,8 @@ const UserSchema: Schema = new Schema({
   gamesWon: { type: Number, default: 0 },
   totalEarnings: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now },
+  photoUrl: { type: String, default: '' },
+  isBanned: { type: Boolean, default: false },
 }, { collection: 'players' });
 
 const GameHistorySchema: Schema = new Schema({
@@ -183,7 +187,7 @@ export async function getUserByTelegramId(telegramId: string) {
   return inMemoryUsers.get(telegramId) || null;
 }
 
-export async function findOrCreateUser(telegramId: string, name: string, username?: string, phoneNumber?: string) {
+export async function findOrCreateUser(telegramId: string, name: string, username?: string, phoneNumber?: string, photoUrl?: string) {
   if (isConnected) {
     try {
       let user = await UserModel.findOne({ telegramId });
@@ -194,6 +198,8 @@ export async function findOrCreateUser(telegramId: string, name: string, usernam
           username,
           phoneNumber,
           balance: 100,
+          photoUrl: photoUrl || '',
+          isBanned: false,
         });
       } else {
         // Always synchronize the player's name and username so they are updated in MongoDB Atlas
@@ -208,6 +214,10 @@ export async function findOrCreateUser(telegramId: string, name: string, usernam
         }
         if (phoneNumber && user.phoneNumber !== phoneNumber) {
           user.phoneNumber = phoneNumber;
+          changed = true;
+        }
+        if (photoUrl && user.photoUrl !== photoUrl) {
+          user.photoUrl = photoUrl;
           changed = true;
         }
         if (changed) {
@@ -231,6 +241,8 @@ export async function findOrCreateUser(telegramId: string, name: string, usernam
       gamesPlayed: 0,
       gamesWon: 0,
       totalEarnings: 0,
+      photoUrl: photoUrl || '',
+      isBanned: false,
       createdAt: new Date(),
     });
   } else {
@@ -246,6 +258,10 @@ export async function findOrCreateUser(telegramId: string, name: string, usernam
     }
     if (phoneNumber && existing.phoneNumber !== phoneNumber) {
       existing.phoneNumber = phoneNumber;
+      changed = true;
+    }
+    if (photoUrl && existing.photoUrl !== photoUrl) {
+      existing.photoUrl = photoUrl;
       changed = true;
     }
     if (changed) {
@@ -454,3 +470,76 @@ export async function getMongoDBLeaderboard() {
     rank: index + 1,
   }));
 }
+
+export async function getAllUsersForAdmin() {
+  if (isConnected) {
+    try {
+      return await UserModel.find({}).sort({ createdAt: -1 }).lean();
+    } catch (e) {
+      console.error('[MongoDB] Error in getAllUsersForAdmin:', e);
+    }
+  }
+  return Array.from(inMemoryUsers.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export async function adminUpdateUser(telegramId: string, updateData: any) {
+  if (isConnected) {
+    try {
+      const user = await UserModel.findOneAndUpdate(
+        { telegramId },
+        { $set: updateData },
+        { new: true }
+      );
+      return user ? user.toObject() : null;
+    } catch (e) {
+      console.error('[MongoDB] Error in adminUpdateUser:', e);
+    }
+  }
+  if (inMemoryUsers.has(telegramId)) {
+    const user = inMemoryUsers.get(telegramId);
+    const updated = { ...user, ...updateData };
+    inMemoryUsers.set(telegramId, updated);
+    return updated;
+  }
+  return null;
+}
+
+export async function adminGetTransactions() {
+  if (isConnected) {
+    try {
+      return await TransactionModel.find({}).sort({ createdAt: -1 }).lean();
+    } catch (e) {
+      console.error('[MongoDB] Error in adminGetTransactions:', e);
+    }
+  }
+  const allTxs: any[] = [];
+  for (const list of inMemoryTransactions.values()) {
+    allTxs.push(...list);
+  }
+  return allTxs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export async function adminUpdateTransaction(txId: string, status: string) {
+  if (isConnected) {
+    try {
+      const tx = await TransactionModel.findOneAndUpdate(
+        { id: txId },
+        { $set: { status } },
+        { new: true }
+      );
+      return tx ? tx.toObject() : null;
+    } catch (e) {
+      console.error('[MongoDB] Error in adminUpdateTransaction:', e);
+    }
+  }
+  for (const [playerId, list] of inMemoryTransactions.entries()) {
+    const idx = list.findIndex((item) => item.id === txId);
+    if (idx !== -1) {
+      list[idx].status = status;
+      inMemoryTransactions.set(playerId, list);
+      return list[idx];
+    }
+  }
+  return null;
+}
+
