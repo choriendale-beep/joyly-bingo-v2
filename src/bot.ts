@@ -227,10 +227,17 @@ export const startBot = async () => {
   }
   try {
     if (!process.env.TELEGRAM_WEBHOOK_URL) {
-      await botInstance.launch();
-      console.log('[Telegram Bot] Launched successfully in polling mode.');
+      await botInstance.launch().catch((err) => {
+        const errMsg = err?.message || String(err);
+        if (errMsg.includes('Conflict') || err?.code === 409 || errMsg.includes('409')) {
+          console.warn('[Telegram Bot] Warning: Conflict detected (another bot instance is already active). Skipping polling start to prevent conflict.');
+        } else {
+          console.error('[Telegram Bot] Failed to launch bot polling:', err);
+        }
+      });
+      console.log('[Telegram Bot] Launched successfully (if no conflict occurred).');
     }
   } catch (err) {
-    console.error('[Telegram Bot] Failed to launch bot:', err);
+    console.error('[Telegram Bot] Failed inside startBot wrapper:', err);
   }
 };
