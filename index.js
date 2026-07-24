@@ -1,4 +1,10 @@
 import 'dotenv/config';
+
+// Automatically align database to bingo_db if luckybingo is specified
+if (process.env.MONGODB_URI && process.env.MONGODB_URI.includes('/luckybingo')) {
+  process.env.MONGODB_URI = process.env.MONGODB_URI.replace('/luckybingo', '/bingo_db');
+}
+
 import express from 'express';
 import mongoose from 'mongoose';
 import { createServer } from 'node:http';
@@ -52,7 +58,7 @@ app.get('/api/db-status', (_req, res) => {
 });
 
 app.get('/api/db-debug-info', async (_req, res) => {
-  let mongoUri = process.env.MONGODB_URI || 'mongodb+srv://admin:hVI9tTaroIlS7fJ1@cluster0.viwaesg.mongodb.net/luckybingo?retryWrites=true&w=majority&appName=Cluster0';
+  let mongoUri = process.env.MONGODB_URI || 'mongodb+srv://admin:hVI9tTaroIlS7fJ1@cluster0.viwaesg.mongodb.net/bingo_db?retryWrites=true&w=majority&appName=Cluster0';
   let redactedUri = mongoUri;
   try {
     const urlObj = new URL(mongoUri.startsWith('mongodb') ? mongoUri : 'mongodb://' + mongoUri);

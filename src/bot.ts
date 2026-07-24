@@ -40,8 +40,13 @@ function setupBotHandlers(bot: Telegraf) {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
-    // Check if user already exists
-    const user = await getUserProfile(telegramId);
+    const firstName = ctx.from?.first_name || '';
+    const lastName = ctx.from?.last_name || '';
+    const name = (firstName + ' ' + lastName).trim() || 'Telegram Player';
+    const username = ctx.from?.username || '';
+
+    // Automatically register or update the player's name & username on MongoDB Atlas
+    const user = await findOrCreateUser(telegramId, name, username);
 
     const webAppUrl = process.env.TELEGRAM_WEBAPP_URL || 'https://joyly-bingo-v2.onrender.com';
 
@@ -122,10 +127,14 @@ function setupBotHandlers(bot: Telegraf) {
     if (!user) return;
 
     await ctx.replyWithHTML(
-      `💵 <b>Your Wallet Balance</b>\n\n` +
-      `💰 Total Balance: <b>${user.balance} ETB</b>\n` +
-      `🎰 Games Played: <b>${user.gamesPlayed}</b>\n` +
-      `🏆 Games Won: <b>${user.gamesWon}</b>`
+      `💵 <b>LUCKY BINGO — Your Wallet Balance / የኪስዎ ሂሳብ</b> 💵\n\n` +
+      `💰 <b>Total Balance:</b> <code style="font-size: 16px;">${user.balance} ETB</code>\n` +
+      `🎰 <b>Games Played:</b> <code>${user.gamesPlayed}</code>\n` +
+      `🏆 <b>Games Won:</b> <code>${user.gamesWon}</code>\n\n` +
+      `📱 <b>Registered Phone:</b> <code>${user.phoneNumber || 'Not linked'}</code>\n` +
+      `🆔 <b>Your Telegram ID:</b> <code>${user.telegramId}</code>\n\n` +
+      `💡 <b>የሚዛን ማስተካከያ መመሪያ (Tip):</b>\n` +
+      `በMongoDB Atlas ላይ የሂሳብ ሚዛን ለመጨመር <b>players</b> ኮሌክሽን ውስጥ <b>telegramId: "${user.telegramId}"</b> የሚለውን ዶክመንት በመፈለግ <b>balance</b> ላይ የሚፈልጉትን ብር ይጨምሩ።`
     );
   });
 

@@ -135,11 +135,16 @@ export function getDbStatus() {
 }
 
 export async function connectMongoDB(): Promise<boolean> {
-  let mongoUri = process.env.MONGODB_URI || 'mongodb+srv://admin:hVI9tTaroIlS7fJ1@cluster0.viwaesg.mongodb.net/luckybingo?retryWrites=true&w=majority&appName=Cluster0';
+  let mongoUri = process.env.MONGODB_URI || 'mongodb+srv://admin:hVI9tTaroIlS7fJ1@cluster0.viwaesg.mongodb.net/bingo_db?retryWrites=true&w=majority&appName=Cluster0';
 
   // Replace placeholder if user passed <db_username>
   if (mongoUri.includes('<db_username>')) {
     mongoUri = mongoUri.replace('<db_username>', 'admin');
+  }
+
+  // Rewrite /luckybingo to /bingo_db to match user's actual database name on MongoDB Atlas
+  if (mongoUri.includes('/luckybingo')) {
+    mongoUri = mongoUri.replace('/luckybingo', '/bingo_db');
   }
 
   if (isConnected) return true;
@@ -190,9 +195,24 @@ export async function findOrCreateUser(telegramId: string, name: string, usernam
           phoneNumber,
           balance: 100,
         });
-      } else if (phoneNumber && !user.phoneNumber) {
-        user.phoneNumber = phoneNumber;
-        await user.save();
+      } else {
+        // Always synchronize the player's name and username so they are updated in MongoDB Atlas
+        let changed = false;
+        if (name && user.name !== name) {
+          user.name = name;
+          changed = true;
+        }
+        if (username && user.username !== username) {
+          user.username = username;
+          changed = true;
+        }
+        if (phoneNumber && user.phoneNumber !== phoneNumber) {
+          user.phoneNumber = phoneNumber;
+          changed = true;
+        }
+        if (changed) {
+          await user.save();
+        }
       }
       return user.toObject();
     } catch (e) {
@@ -213,10 +233,22 @@ export async function findOrCreateUser(telegramId: string, name: string, usernam
       totalEarnings: 0,
       createdAt: new Date(),
     });
-  } else if (phoneNumber) {
+  } else {
     const existing = inMemoryUsers.get(telegramId);
-    if (existing && !existing.phoneNumber) {
+    let changed = false;
+    if (name && existing.name !== name) {
+      existing.name = name;
+      changed = true;
+    }
+    if (username && existing.username !== username) {
+      existing.username = username;
+      changed = true;
+    }
+    if (phoneNumber && existing.phoneNumber !== phoneNumber) {
       existing.phoneNumber = phoneNumber;
+      changed = true;
+    }
+    if (changed) {
       inMemoryUsers.set(telegramId, existing);
     }
   }
