@@ -130,7 +130,7 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
 
 
       {/* 1..400 Ticket Grid */}
-      <div className="bg-[#181d30] border border-slate-800 rounded-2xl p-2.5 max-h-[260px] overflow-y-auto mb-3">
+      <div className="bg-[#181d30] border border-slate-800 rounded-2xl p-2.5 max-h-[240px] overflow-y-auto mb-2.5">
         <div className="grid grid-cols-8 gap-1.5">
           {tickets.map((ticket) => {
             const isSelected = ticket.selected;
@@ -142,23 +142,64 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
                 key={ticket.number}
                 disabled={isTakenByOther}
                 onClick={() => !isTakenByOther && onToggleTicket(ticket.number)}
-                title={isTakenByOther ? `በሌላ ሰው የተያዘ (${reservedOwner})` : `Ticket #${ticket.number}`}
+                title={isTakenByOther ? `በሌላ ሰው የተያዘ: ${reservedOwner}` : `Ticket #${ticket.number}`}
                 className={`
                   aspect-square rounded-lg flex flex-col items-center justify-center font-extrabold text-xs transition-all cursor-pointer select-none relative
                   ${
                     isTakenByOther
-                      ? 'bg-orange-600 text-white border border-orange-400/90 shadow-sm opacity-95 cursor-not-allowed'
+                      ? 'bg-orange-600 text-white border border-orange-400 shadow-sm opacity-90 cursor-not-allowed'
                       : isSelected
-                      ? 'bg-amber-400 text-slate-950 font-black border-2 border-amber-300 shadow-md scale-105'
+                      ? 'bg-amber-400 text-slate-950 font-black border-2 border-white shadow-lg scale-105 ring-2 ring-amber-400/50'
                       : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60'
                   }
                 `}
               >
-                {ticket.number}
+                <span>{ticket.number}</span>
+                {isSelected && (
+                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 text-white rounded-full text-[9px] flex items-center justify-center font-bold border border-white">
+                    ✓
+                  </span>
+                )}
+                {isTakenByOther && (
+                  <span className="text-[7px] text-orange-200 truncate max-w-full px-0.5 leading-none mt-0.5">
+                    {reservedOwner.slice(0, 5)}
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
+      </div>
+
+      {/* Selected Tickets Summary Bar */}
+      <div className="bg-[#181d30] border border-slate-800 rounded-xl p-2 mb-2.5 flex flex-col gap-1.5">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="font-bold text-amber-400 uppercase tracking-wider">
+            የመረጧቸው ካርቴላዎች ({selectedTickets.length}/6):
+          </span>
+          <span className="text-slate-400 text-[10px]">
+            {selectedTickets.length === 0 ? 'ካርቴላ አልመረጡም' : selectedTickets.map(t => `#${t.number}`).join(', ')}
+          </span>
+        </div>
+        {selectedTickets.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 max-h-16 overflow-y-auto">
+            {selectedTickets.map((t) => (
+              <div
+                key={t.number}
+                className="bg-amber-500/20 border border-amber-500/40 text-amber-300 px-2 py-0.5 rounded-lg text-xs font-bold flex items-center gap-1.5"
+              >
+                <span>#{t.number}</span>
+                <button
+                  onClick={() => onToggleTicket(t.number)}
+                  className="hover:text-white text-amber-400 font-black text-sm leading-none cursor-pointer"
+                  title="Remove"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Selected Cartel Preview Area (White Cartel Card + Colorful B-I-N-G-O Header) */}
@@ -170,8 +211,8 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
             </span>
 
             {/* White Cartel Card */}
-            <div className="w-full max-w-[200px] bg-white p-2 rounded-xl shadow-lg border border-slate-200">
-              <div className="grid grid-cols-5 gap-1">
+            <div className="w-full max-w-[160px] bg-white p-1.5 rounded-xl shadow-md border border-slate-200">
+              <div className="grid grid-cols-5 gap-0.5">
                 {[
                   { letter: 'B', color: 'bg-blue-600 text-white' },
                   { letter: 'I', color: 'bg-indigo-600 text-white' },
@@ -181,7 +222,7 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
                 ].map((item) => (
                   <div
                     key={item.letter}
-                    className={`${item.color} font-black text-center py-0.5 text-[9px] rounded uppercase shadow-sm`}
+                    className={`${item.color} font-black text-center py-0.5 text-[8px] rounded uppercase shadow-sm`}
                   >
                     {item.letter}
                   </div>
@@ -190,14 +231,14 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
                   row.map((cell, cIdx) => (
                     <div
                       key={`${rIdx}-${cIdx}`}
-                      className={`aspect-square font-bold text-[10px] flex items-center justify-center rounded border ${
+                      className={`aspect-square font-bold text-[9px] flex items-center justify-center rounded border ${
                         cell.number === 'FREE'
                           ? 'bg-teal-500 text-white font-black border-teal-600'
                           : 'bg-slate-100 text-slate-900 border-slate-200'
                       }`}
                     >
                       {cell.number === 'FREE' ? (
-                        <span className="text-white text-[8px]">★</span>
+                        <span className="text-white text-[7px]">★</span>
                       ) : (
                         cell.number
                       )}

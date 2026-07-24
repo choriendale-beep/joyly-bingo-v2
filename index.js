@@ -44,6 +44,8 @@ const io = new SocketIOServer(httpServer, {
   cors: {
     origin: '*',
   },
+  pingTimeout: 30000,
+  pingInterval: 10000,
 });
 
 setupBingoSocket(io);

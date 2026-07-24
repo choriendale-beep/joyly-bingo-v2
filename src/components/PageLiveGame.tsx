@@ -4,6 +4,73 @@ import { checkBingoWin } from '../lib/bingo';
 import { Volume2, VolumeX, RefreshCw, LogOut, CheckCircle2, Crown, Eye } from 'lucide-react';
 import { socket, emitClaimBingo, emitJoinGame, emitSpectateGame, RoomState } from '../lib/socket';
 
+interface CartelCardProps {
+  cartel: Cartel;
+  cartelIndex: number;
+  calledSet: Set<number>;
+  headerColors: string[];
+  onCellClick: (cartelIndex: number, rIdx: number, cIdx: number) => void;
+  isSpectator: boolean;
+}
+
+const CartelCard: React.FC<CartelCardProps> = React.memo(({
+  cartel,
+  cartelIndex,
+  calledSet,
+  headerColors,
+  onCellClick,
+  isSpectator,
+}) => {
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-1.5 flex flex-col gap-1 shrink-0 shadow-md text-slate-900 max-w-[170px] mx-auto w-full">
+      <div className="text-center text-[9px] font-black text-amber-600 uppercase tracking-widest">
+        TICKET NO #{cartel.ticketNumber}
+      </div>
+
+      <div className="grid grid-cols-5 gap-0.5 bg-slate-100 p-1 rounded-lg border border-slate-200">
+        {['B', 'I', 'N', 'G', 'O'].map((letter, i) => (
+          <div
+            key={letter}
+            className={`${headerColors[i]} font-black text-center py-0.5 text-[9px] rounded uppercase shadow-sm`}
+          >
+            {letter}
+          </div>
+        ))}
+        {cartel.grid.map((row, rIdx) =>
+          row.map((cell, cIdx) => {
+            const isFree = cell.number === 'FREE';
+            const numVal = isFree ? 0 : (cell.number as number);
+            const isCalled = !isFree && calledSet.has(numVal);
+            const isDaubed = cell.daubed;
+
+            return (
+              <button
+                key={`${rIdx}-${cIdx}`}
+                onClick={() => !isSpectator && onCellClick(cartelIndex, rIdx, cIdx)}
+                className={`
+                  aspect-square rounded flex items-center justify-center font-black text-[10px] transition-all cursor-pointer select-none shadow-sm border
+                  ${
+                    isFree
+                      ? 'bg-teal-500 text-white font-black border-teal-600'
+                      : isDaubed
+                      ? 'bg-orange-500 text-white font-black scale-95 border-orange-600'
+                      : isCalled
+                      ? 'bg-amber-300 text-slate-950 font-black border-2 border-orange-500 animate-pulse'
+                      : 'bg-white text-slate-900 font-bold hover:bg-slate-50 border-slate-200'
+                  }
+                `}
+              >
+                {isFree ? '★' : cell.number}
+              </button>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+});
+CartelCard.displayName = 'CartelCard';
+
 interface PageLiveGameProps {
   player: Player;
   gameId: string;
@@ -261,7 +328,10 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
     );
   };
 
-  const calledSet = new Set(calledBalls.map((b) => b.number));
+  const calledSet = React.useMemo(
+    () => new Set(calledBalls.map((b) => b.number)),
+    [calledBalls]
+  );
 
   // Colorful B-I-N-G-O letter headers
   const headerColors = [
@@ -274,57 +344,7 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
 
   return (
     <div className="flex-1 flex flex-col max-w-md mx-auto w-full px-2 pt-2 pb-20 text-white">
-      {/* Player Header Bar */}
-      <div className="flex items-center justify-between bg-[#181d30] border border-slate-800 px-3 py-1.5 rounded-2xl mb-2 text-xs">
-        <button
-          onClick={onOpenProfile}
-          className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition"
-          title="View Telegram Profile"
-        >
-          {player.photo_url ? (
-            <img
-              src={player.photo_url}
-              alt={player.first_name || 'Profile'}
-              className="w-6 h-6 rounded-full object-cover border border-amber-400"
-            />
-          ) : (
-            <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 text-slate-950 font-black flex items-center justify-center text-[10px]">
-              {player.first_name?.[0] || 'P'}
-            </div>
-          )}
-          <div className="text-left">
-            <span className="font-bold text-slate-200 text-xs block leading-none">
-              {player.first_name || player.username || 'Player'}
-            </span>
-            {player.username && (
-              <span className="text-[9px] text-amber-400 block leading-tight">
-                @{player.username.replace('@', '')}
-              </span>
-            )}
-          </div>
-        </button>
 
-        <button
-          onClick={onLeaveGame}
-          className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-xl text-[10px] font-bold border border-slate-700 flex items-center gap-1 cursor-pointer transition"
-        >
-          <LogOut className="w-3 h-3 text-rose-400" />
-          <span>Leave</span>
-        </button>
-      </div>
-
-      {/* Spectator Mode Banner */}
-      {isSpectator && (
-        <div className="flex items-center justify-between bg-sky-950/70 border border-sky-800/80 px-3 py-2 rounded-2xl text-sky-300 text-xs font-bold mb-2 shadow-lg backdrop-blur-sm">
-          <div className="flex items-center gap-2">
-            <Eye className="w-4 h-4 text-sky-400 animate-pulse" />
-            <span>ተመልካች ({player.first_name || player.username || 'Spectator'}) - Spectator Mode</span>
-          </div>
-          <span className="text-[10px] uppercase tracking-wider text-sky-400/90 font-mono bg-sky-900/60 px-2 py-0.5 rounded-full border border-sky-700/50">
-            Observer
-          </span>
-        </div>
-      )}
 
       {/* Top Stats Bar */}
       <div className="grid grid-cols-5 gap-1 bg-[#181d30] border border-slate-800 p-2 rounded-2xl mb-2 text-center">
@@ -449,55 +469,15 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
 
           {/* ALL Selected Cartels Display (White Cartel Card with colorful B-I-N-G-O header) */}
           {activeCartels.map((cartel, cartelIdx) => (
-            <div
+            <CartelCard
               key={cartel.id || cartelIdx}
-              className="bg-white border border-slate-200 rounded-2xl p-2 flex flex-col gap-1 shrink-0 shadow-lg text-slate-900"
-            >
-              <div className="text-center text-[10px] font-black text-amber-600 uppercase tracking-widest">
-                TICKET NO #{cartel.ticketNumber}
-              </div>
-
-              {/* 5x5 Grid */}
-              <div className="grid grid-cols-5 gap-1 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
-                {['B', 'I', 'N', 'G', 'O'].map((letter, i) => (
-                  <div
-                    key={letter}
-                    className={`${headerColors[i]} font-black text-center py-0.5 text-[10px] rounded uppercase shadow-sm`}
-                  >
-                    {letter}
-                  </div>
-                ))}
-                {cartel.grid.map((row, rIdx) =>
-                  row.map((cell, cIdx) => {
-                    const isFree = cell.number === 'FREE';
-                    const numVal = isFree ? 0 : (cell.number as number);
-                    const isCalled = !isFree && calledSet.has(numVal);
-                    const isDaubed = cell.daubed;
-
-                    return (
-                      <button
-                        key={`${rIdx}-${cIdx}`}
-                        onClick={() => handleCellClick(cartelIdx, rIdx, cIdx)}
-                        className={`
-                          aspect-square rounded flex items-center justify-center font-black text-[11px] transition-all cursor-pointer select-none shadow-sm border
-                          ${
-                            isFree
-                              ? 'bg-teal-500 text-white font-black border-teal-600'
-                              : isDaubed
-                              ? 'bg-orange-500 text-white font-black scale-95 border-orange-600'
-                              : isCalled
-                              ? 'bg-amber-300 text-slate-950 font-black border-2 border-orange-500 animate-pulse'
-                              : 'bg-white text-slate-900 font-bold hover:bg-slate-50 border-slate-200'
-                          }
-                        `}
-                      >
-                        {isFree ? '★' : cell.number}
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </div>
+              cartel={cartel}
+              cartelIndex={cartelIdx}
+              calledSet={calledSet}
+              headerColors={headerColors}
+              onCellClick={handleCellClick}
+              isSpectator={isSpectator}
+            />
           ))}
         </div>
       </div>
