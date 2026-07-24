@@ -17,6 +17,10 @@ import { RulesModal } from './components/RulesModal';
 import { socket, RoomState } from './lib/socket';
 
 export const App: React.FC = () => {
+  const [isAdminRoute] = useState<boolean>(() => {
+    return window.location.pathname === '/admin' || window.location.pathname === '/admin/';
+  });
+
   // Navigation & Game Stage
   const [activeTab, setActiveTab] = useState<NavTab>('GAME');
   const [gameStage, setGameStage] = useState<GameStage>('HOME');
@@ -238,6 +242,10 @@ export const App: React.FC = () => {
 
   const selectedTicketsList = tickets.filter((t) => t.selected);
 
+  if (isAdminRoute) {
+    return <PageAdmin />;
+  }
+
   return (
     <div className="min-h-screen bg-[#0b0e17] text-slate-100 flex flex-col font-sans antialiased relative selection:bg-amber-500 selection:text-slate-950">
       {/* Main Page Rendering according to activeTab */}
@@ -299,8 +307,6 @@ export const App: React.FC = () => {
       )}
 
       {activeTab === 'PROFILE' && <PageProfile player={player} />}
-
-      {activeTab === 'ADMIN' && <PageAdmin />}
 
       {/* Bottom Navigation Bar across all views */}
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} botHandle="@dilbingo_bot" />

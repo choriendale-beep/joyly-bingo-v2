@@ -19,7 +19,8 @@ import {
   AlertTriangle,
   ChevronRight,
   Sparkles,
-  Info
+  Info,
+  Lock
 } from 'lucide-react';
 
 interface AdminUser {
@@ -60,8 +61,16 @@ export const PageAdmin: React.FC = () => {
   const [viewingSlipTx, setViewingSlipTx] = useState<AdminTransaction | null>(null);
   const [infoMessage, setInfoMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
+  // Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return sessionStorage.getItem('lucky_bingo_admin_auth') === 'true';
+  });
+  const [pinInput, setPinInput] = useState<string>('');
+  const [loginError, setLoginError] = useState<string>('');
+
   // Load Admin Data
   const loadData = async () => {
+    if (!isAuthenticated) return;
     setLoading(true);
     try {
       const [resUsers, resTxs] = await Promise.all([
@@ -80,8 +89,27 @@ export const PageAdmin: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (isAuthenticated) {
+      loadData();
+    }
+  }, [isAuthenticated]);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pinInput === '0909' || pinInput === 'admin123') {
+      sessionStorage.setItem('lucky_bingo_admin_auth', 'true');
+      setIsAuthenticated(true);
+      setLoginError('');
+    } else {
+      setLoginError('ትክክለኛ ያልሆነ ሚስጥራዊ ቁልፍ! እባክዎ እንደገና ይሞክሩ። (Incorrect PIN!)');
+    }
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('lucky_bingo_admin_auth');
+    setIsAuthenticated(false);
+    setPinInput('');
+  };
 
   const showToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
     setInfoMessage({ text, type });
@@ -198,6 +226,71 @@ export const PageAdmin: React.FC = () => {
     );
   };
 
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#0b0e17] flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-[#121624] border border-slate-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+          {/* Decorative glows */}
+          <div className="absolute -top-10 -left-10 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div className="flex flex-col items-center text-center relative z-10">
+            <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
+              <Lock className="w-8 h-8" />
+            </div>
+            
+            <h1 className="text-xl font-black tracking-tight text-white mb-2 uppercase">
+              👑 LUCKY BINGO ADMIN
+            </h1>
+            <p className="text-xs text-slate-400 mb-6 max-w-xs">
+              ይህ የአስተዳዳሪ ፖርታል (Admin Portal) ነው። ለመግባት እባክዎ የአስተዳዳሪውን ሚስጥራዊ ቁልፍ (PIN/Password) ያስገቡ።
+            </p>
+
+            <form onSubmit={handleLogin} className="w-full space-y-4">
+              <div>
+                <label className="block text-left text-[10px] uppercase tracking-wider text-slate-400 mb-1.5 font-bold">
+                  ሚስጥራዊ የይለፍ ቃል / PIN
+                </label>
+                <input
+                  type="password"
+                  value={pinInput}
+                  onChange={(e) => setPinInput(e.target.value)}
+                  placeholder="የይለፍ ቃል ያስገቡ..."
+                  className="w-full bg-[#0b0e17] border border-slate-800 hover:border-slate-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 outline-none transition-all text-center tracking-widest font-mono font-bold"
+                  autoFocus
+                />
+              </div>
+
+              {loginError && (
+                <div className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3.5 py-2.5 text-center flex items-center justify-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                  {loginError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold py-3 px-4 rounded-xl shadow-lg shadow-amber-500/10 active:scale-[0.98] transition cursor-pointer flex items-center justify-center gap-2 text-sm"
+              >
+                <Shield className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+                በደህንነት ግባ (Login Securely)
+              </button>
+            </form>
+
+            <div className="mt-8 border-t border-slate-800/80 pt-4 w-full text-center">
+              <a
+                href="/"
+                className="text-xs text-slate-500 hover:text-slate-300 transition flex items-center justify-center gap-1.5"
+              >
+                ← ወደ ተጫዋች መተግበሪያ ተመለስ (Back to Game)
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col font-sans pb-24 relative select-none">
       
@@ -312,7 +405,13 @@ export const PageAdmin: React.FC = () => {
               </div>
             </div>
 
-            <div className="border-t border-slate-800/80 pt-4 text-center">
+            <div className="border-t border-slate-800/80 pt-4 space-y-2 text-center">
+              <button
+                onClick={handleLogout}
+                className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/25 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                ውጣ (Logout)
+              </button>
               <p className="text-[10px] text-slate-500 font-mono">Lucky Bingo Admin Panel v1.0</p>
             </div>
           </div>
