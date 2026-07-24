@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { TicketItem, CalledBall, Cartel, Player } from '../types';
 import { checkBingoWin } from '../lib/bingo';
 import { Volume2, VolumeX, RefreshCw, LogOut, CheckCircle2, Crown } from 'lucide-react';
-import { socket, emitClaimBingo, RoomState } from '../lib/socket';
+import { socket, emitClaimBingo, emitJoinGame, RoomState } from '../lib/socket';
 
 interface PageLiveGameProps {
   player: Player;
@@ -41,7 +41,7 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
 
   // Real synchronized players count & Derash from Socket.IO server
   const [playersCount, setPlayersCount] = useState<number>(18);
-  const [derash, setDerash] = useState<number>(selectedTickets.length * stake * 0.85 || 120);
+  const [derash, setDerash] = useState<number>(stake * 8 || 80);
 
   const winHandledRef = useRef<boolean>(false);
   const leaveGameHandledRef = useRef<boolean>(false);
@@ -115,7 +115,11 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
 
     const handleRoomState = (state: RoomState) => {
       if (state.playersCount) setPlayersCount(state.playersCount);
-      if (state.derash) setDerash(state.derash);
+      if (state.derash) {
+        setDerash(Math.max(state.derash, stake * 8));
+      } else {
+        setDerash(stake * 8);
+      }
       if (state.calledBalls && state.calledBalls.length > 0) {
         setCalledBalls(state.calledBalls);
         if (isAutomatic) {
@@ -148,6 +152,10 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
     socket.on('ball_called', handleBallCalled);
     socket.on('game_over', handleGameOver);
     socket.on('room_state', handleRoomState);
+
+    // Emit join_game with selected tickets to validate on server before play
+    const ticketNumbers = selectedTickets.map((t) => t.number);
+    emitJoinGame(player.first_name || player.username || 'Player', ticketNumbers, stake);
 
     return () => {
       socket.off('ball_called', handleBallCalled);

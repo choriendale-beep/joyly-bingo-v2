@@ -10,8 +10,20 @@ export const PageScores: React.FC = () => {
   useEffect(() => {
     const p = getStoredPlayer();
     setPlayer(p);
+    
+    // Fast initial load from local cache
     const scores = getScoresLeaderboard();
     setLeaderboards(scores);
+
+    // Fetch live leaderboard from MongoDB Atlas
+    fetch('/api/leaderboard')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.leaderboard) {
+          setLeaderboards(data.leaderboard);
+        }
+      })
+      .catch((err) => console.error('Failed to fetch live leaderboard:', err));
   }, []);
 
   return (

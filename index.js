@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import mongoose from 'mongoose';
 import { createServer } from 'node:http';
 import { Server as SocketIOServer } from 'socket.io';
 import fs from 'node:fs';
@@ -7,7 +8,19 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer } from 'vite';
 import { setupBingoSocket } from './src/bingoSocket';
-import { connectMongoDB, getUsersList, findOrCreateUser, updateUserBalance, getDbStatus } from './src/db/mongodb';
+import {
+  connectMongoDB,
+  getUsersList,
+  findOrCreateUser,
+  updateUserBalance,
+  getDbStatus,
+  getUserProfile,
+  saveTransaction,
+  getPlayerTransactions,
+  savePlayerHistory,
+  getPlayerHistory,
+  getMongoDBLeaderboard
+} from './src/db/mongodb';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,9 +38,8 @@ const io = new SocketIOServer(httpServer, {
 
 setupBingoSocket(io);
 
-const host = process.env.HOST || '0.0.0.0';
-const envPort = Number.parseInt(process.env.PORT ?? '', 10);
-const port = Number.isFinite(envPort) && envPort > 0 ? envPort : 3000;
+const host = '0.0.0.0';
+const port = 3000;
 
 app.use(express.json());
 
@@ -37,6 +49,39 @@ app.get('/api/health', (_req, res) => {
 
 app.get('/api/db-status', (_req, res) => {
   res.json({ success: true, ...getDbStatus() });
+});
+
+app.get('/api/db-debug-info', async (_req, res) => {
+  let mongoUri = process.env.MONGODB_URI || 'mongodb+srv://admin:hVI9tTaroIlS7fJ1@cluster0.viwaesg.mongodb.net/luckybingo?retryWrites=true&w=majority&appName=Cluster0';
+  let redactedUri = mongoUri;
+  try {
+    const urlObj = new URL(mongoUri.startsWith('mongodb') ? mongoUri : 'mongodb://' + mongoUri);
+    if (urlObj.password) {
+      urlObj.password = '****';
+    }
+    redactedUri = urlObj.toString();
+  } catch(e) {}
+
+  let testError = null;
+  let testSuccess = false;
+  try {
+    const conn = await mongoose.createConnection(mongoUri, {
+      connectTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 5000,
+    }).asPromise();
+    testSuccess = true;
+    await conn.close();
+  } catch (err) {
+    testError = err instanceof Error ? err.message : String(err);
+  }
+
+  res.json({
+    envUriSet: !!process.env.MONGODB_URI,
+    redactedUri,
+    readyState: mongoose.connection.readyState,
+    testSuccess,
+    testError,
+  });
 });
 
 app.get('/healthz', (_req, res) => {
@@ -75,6 +120,80 @@ app.post('/api/users/balance', async (req, res) => {
     res.json({ success: true, user });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Failed to update user balance' });
+  }
+});
+
+// GET user profile stats and balance
+app.get('/api/users/:telegramId', async (req, res) => {
+  try {
+    const { telegramId } = req.params;
+    const user = await getUserProfile(telegramId);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    res.json({ success: true, user });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to fetch user profile' });
+  }
+});
+
+// GET leaderboard (Scores)
+app.get('/api/leaderboard', async (_req, res) => {
+  try {
+    const leaderboard = await getMongoDBLeaderboard();
+    res.json({ success: true, leaderboard });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to fetch leaderboard' });
+  }
+});
+
+// GET transaction history for a player
+app.get('/api/transactions/:playerId', async (req, res) => {
+  try {
+    const { playerId } = req.params;
+    const transactions = await getPlayerTransactions(playerId);
+    res.json({ success: true, transactions });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to fetch transactions' });
+  }
+});
+
+// POST save a transaction
+app.post('/api/transactions', async (req, res) => {
+  try {
+    const tx = req.body;
+    if (!tx || !tx.id || !tx.playerId) {
+      return res.status(400).json({ success: false, error: 'Invalid transaction data' });
+    }
+    const saved = await saveTransaction(tx);
+    res.json({ success: true, transaction: saved });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to save transaction' });
+  }
+});
+
+// GET match history for a player
+app.get('/api/history/:playerId', async (req, res) => {
+  try {
+    const { playerId } = req.params;
+    const history = await getPlayerHistory(playerId);
+    res.json({ success: true, history });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to fetch game history' });
+  }
+});
+
+// POST save a match history entry
+app.post('/api/history', async (req, res) => {
+  try {
+    const entry = req.body;
+    if (!entry || !entry.id || !entry.playerId) {
+      return res.status(400).json({ success: false, error: 'Invalid history data' });
+    }
+    const saved = await savePlayerHistory(entry);
+    res.json({ success: true, history: saved });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to save history entry' });
   }
 });
 

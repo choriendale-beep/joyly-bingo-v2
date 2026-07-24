@@ -59,7 +59,7 @@ export interface GameHistoryEntry {
 export interface Transaction {
   id: string;
   playerId: string;
-  type: 'deposit' | 'withdrawal' | 'signup_bonus' | 'stake' | 'win';
+  type: 'deposit' | 'withdrawal' | 'signup_bonus' | 'stake' | 'win' | 'refund';
   amount: number;
   status: 'completed' | 'pending';
   createdAt: string;

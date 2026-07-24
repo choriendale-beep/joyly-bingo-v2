@@ -20,9 +20,32 @@ export const TransactionsModal: React.FC<TransactionsModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setLoading(true);
-      const txs = getTransactions();
-      setTransactions(txs);
-      setLoading(false);
+      // Fast fallback to local cache
+      const localTxs = getTransactions();
+      setTransactions(localTxs);
+
+      // Fetch live from MongoDB Atlas
+      fetch(`/api/transactions/${playerId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.transactions) {
+            const formatted = data.transactions.map((tx: any) => ({
+              id: tx.id,
+              playerId: tx.playerId,
+              type: tx.type,
+              amount: tx.amount,
+              status: tx.status,
+              createdAt: tx.createdAt,
+              description: tx.description,
+            }));
+            setTransactions(formatted);
+          }
+          setLoading(false);
+        })
+        .catch((err) => {
+          console.error('Failed to fetch transaction history:', err);
+          setLoading(false);
+        });
     }
   }, [isOpen, playerId]);
 

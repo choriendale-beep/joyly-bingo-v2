@@ -19,6 +19,29 @@ export interface IGameHistory extends Document {
   timestamp: Date;
 }
 
+export interface ITransaction extends Document {
+  id: string;
+  playerId: string;
+  type: string;
+  amount: number;
+  status: string;
+  createdAt: Date;
+  description?: string;
+}
+
+export interface IPlayerHistory extends Document {
+  id: string;
+  playerId: string;
+  gameId: string;
+  date: string;
+  stake: number;
+  ticketsCount: number;
+  potWon: number;
+  status: string;
+  pattern?: string;
+  timestamp: Date;
+}
+
 const UserSchema: Schema = new Schema({
   telegramId: { type: String, required: true, unique: true },
   name: { type: String, required: true },
@@ -28,7 +51,7 @@ const UserSchema: Schema = new Schema({
   gamesWon: { type: Number, default: 0 },
   totalEarnings: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now },
-});
+}, { collection: 'players' });
 
 const GameHistorySchema: Schema = new Schema({
   gameId: { type: String, required: true },
@@ -36,15 +59,42 @@ const GameHistorySchema: Schema = new Schema({
   derashWon: { type: Number, required: true },
   stakedTickets: { type: Number, required: true },
   timestamp: { type: Date, default: Date.now },
-});
+}, { collection: 'game_histories' });
+
+const TransactionSchema: Schema = new Schema({
+  id: { type: String, required: true, unique: true },
+  playerId: { type: String, required: true },
+  type: { type: String, required: true },
+  amount: { type: Number, required: true },
+  status: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
+  description: { type: String },
+}, { collection: 'transactions' });
+
+const PlayerHistorySchema: Schema = new Schema({
+  id: { type: String, required: true, unique: true },
+  playerId: { type: String, required: true },
+  gameId: { type: String, required: true },
+  date: { type: String, required: true },
+  stake: { type: Number, required: true },
+  ticketsCount: { type: Number, required: true },
+  potWon: { type: Number, required: true },
+  status: { type: String, required: true },
+  pattern: { type: String },
+  timestamp: { type: Date, default: Date.now },
+}, { collection: 'player_histories' });
 
 export const UserModel = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
 export const GameHistoryModel = mongoose.models.GameHistory || mongoose.model<IGameHistory>('GameHistory', GameHistorySchema);
+export const TransactionModel = mongoose.models.Transaction || mongoose.model<ITransaction>('Transaction', TransactionSchema);
+export const PlayerHistoryModel = mongoose.models.PlayerHistory || mongoose.model<IPlayerHistory>('PlayerHistory', PlayerHistorySchema);
 
 let isConnected = false;
 
 // Memory fallback store if MongoDB URI is not set or unavailable
 const inMemoryUsers = new Map<string, any>();
+const inMemoryTransactions = new Map<string, any[]>();
+const inMemoryHistory = new Map<string, any[]>();
 
 export async function seedInitialUsers() {
   const defaultPlayers = [
@@ -209,4 +259,136 @@ export async function getUsersList() {
     }
   }
   return Array.from(inMemoryUsers.values());
+}
+
+export async function getUserProfile(telegramId: string) {
+  if (isConnected) {
+    try {
+      const user = await UserModel.findOne({ telegramId });
+      return user ? user.toObject() : null;
+    } catch (e) {
+      console.error('[MongoDB] Error getting user profile:', e);
+    }
+  }
+  return inMemoryUsers.get(telegramId) || null;
+}
+
+export async function saveTransaction(tx: any) {
+  if (isConnected) {
+    try {
+      await TransactionModel.findOneAndUpdate(
+        { id: tx.id },
+        tx,
+        { upsert: true, new: true }
+      );
+      return tx;
+    } catch (e) {
+      console.error('[MongoDB] Error saving transaction:', e);
+    }
+  }
+
+  // Fallback
+  const list = inMemoryTransactions.get(tx.playerId) || [];
+  if (!list.some((item) => item.id === tx.id)) {
+    list.unshift({ ...tx, createdAt: tx.createdAt ? new Date(tx.createdAt) : new Date() });
+    inMemoryTransactions.set(tx.playerId, list);
+  }
+  return tx;
+}
+
+export async function getPlayerTransactions(playerId: string) {
+  if (isConnected) {
+    try {
+      return await TransactionModel.find({ playerId }).sort({ createdAt: -1 }).lean();
+    } catch (e) {
+      console.error('[MongoDB] Error getting player transactions:', e);
+    }
+  }
+  return inMemoryTransactions.get(playerId) || [];
+}
+
+export async function savePlayerHistory(entry: any) {
+  if (isConnected) {
+    try {
+      await PlayerHistoryModel.findOneAndUpdate(
+        { id: entry.id },
+        entry,
+        { upsert: true, new: true }
+      );
+      // Increment games played/won in user model
+      const isWin = entry.status === 'WON';
+      await UserModel.updateOne(
+        { telegramId: entry.playerId },
+        {
+          $inc: {
+            gamesPlayed: 1,
+            gamesWon: isWin ? 1 : 0,
+            totalEarnings: isWin ? entry.potWon : 0,
+          },
+        }
+      );
+      return entry;
+    } catch (e) {
+      console.error('[MongoDB] Error saving player history:', e);
+    }
+  }
+
+  // Fallback
+  const list = inMemoryHistory.get(entry.playerId) || [];
+  if (!list.some((item) => item.id === entry.id)) {
+    list.unshift({ ...entry, timestamp: new Date() });
+    inMemoryHistory.set(entry.playerId, list);
+  }
+
+  // Update inMemoryUser stats
+  if (inMemoryUsers.has(entry.playerId)) {
+    const user = inMemoryUsers.get(entry.playerId);
+    user.gamesPlayed = (user.gamesPlayed || 0) + 1;
+    if (entry.status === 'WON') {
+      user.gamesWon = (user.gamesWon || 0) + 1;
+      user.totalEarnings = (user.totalEarnings || 0) + entry.potWon;
+    }
+    inMemoryUsers.set(entry.playerId, user);
+  }
+
+  return entry;
+}
+
+export async function getPlayerHistory(playerId: string) {
+  if (isConnected) {
+    try {
+      return await PlayerHistoryModel.find({ playerId }).sort({ timestamp: -1 }).lean();
+    } catch (e) {
+      console.error('[MongoDB] Error getting player history:', e);
+    }
+  }
+  return inMemoryHistory.get(playerId) || [];
+}
+
+export async function getMongoDBLeaderboard() {
+  if (isConnected) {
+    try {
+      const users = await UserModel.find().sort({ totalEarnings: -1 }).limit(20).lean();
+      return users.map((u, index) => ({
+        id: u.telegramId,
+        username: u.username || u.name || 'Player',
+        wins: u.gamesWon || 0,
+        totalEarnings: u.totalEarnings || 0,
+        rank: index + 1,
+      }));
+    } catch (e) {
+      console.error('[MongoDB] Error getting MongoDB leaderboard:', e);
+    }
+  }
+
+  // Fallback based on inMemoryUsers
+  const list = Array.from(inMemoryUsers.values()) as any[];
+  list.sort((a, b) => (b.totalEarnings || 0) - (a.totalEarnings || 0));
+  return list.map((u, index) => ({
+    id: u.telegramId,
+    username: u.username || u.name || 'Player',
+    wins: u.gamesWon || 0,
+    totalEarnings: u.totalEarnings || 0,
+    rank: index + 1,
+  }));
 }

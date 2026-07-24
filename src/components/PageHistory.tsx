@@ -1,14 +1,42 @@
 import React, { useEffect, useState } from 'react';
 import { Clock, CheckCircle2, XCircle, History } from 'lucide-react';
 import { GameHistoryEntry } from '../types';
-import { getGameHistory } from '../lib/storage';
+import { getGameHistory, getStoredPlayer } from '../lib/storage';
 
 export const PageHistory: React.FC = () => {
   const [historyData, setHistoryData] = useState<GameHistoryEntry[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const data = getGameHistory();
-    setHistoryData(data);
+    const p = getStoredPlayer();
+    // Fast local fallback
+    const localHistory = getGameHistory();
+    setHistoryData(localHistory);
+
+    // Fetch live from MongoDB Atlas
+    fetch(`/api/history/${p.id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.history) {
+          // Map to match front-end types
+          const formatted = data.history.map((h: any) => ({
+            id: h.id,
+            gameId: h.gameId,
+            date: h.date,
+            stake: h.stake,
+            ticketsCount: h.ticketsCount,
+            potWon: h.potWon,
+            status: h.status,
+            pattern: h.pattern,
+          }));
+          setHistoryData(formatted);
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch match history:', err);
+        setLoading(false);
+      });
   }, []);
 
   return (

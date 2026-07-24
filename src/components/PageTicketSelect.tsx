@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Player, TicketItem, Cartel } from '../types';
-import { ArrowLeft, RefreshCw, Users, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Lock } from 'lucide-react';
 import { socket, emitSelectTickets, RoomState } from '../lib/socket';
 
 interface PageTicketSelectProps {
@@ -25,8 +25,8 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
   const [timerSeconds, setTimerSeconds] = useState<number>(35);
   const [realPlayersCount, setRealPlayersCount] = useState<number>(1);
   const [realDerash, setRealDerash] = useState<number>(120);
+  const [reservedTicketsMap, setReservedTicketsMap] = useState<Record<number, string>>({});
   const [activePreviewCartel, setActivePreviewCartel] = useState<Cartel | null>(null);
-  const timerExpiredRef = useRef<boolean>(false);
 
   // Selected tickets count
   const selectedTickets = tickets.filter((t) => t.selected);
@@ -34,18 +34,19 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
   // Emit ticket updates to Socket.IO server whenever user picks/unpicks tickets
   useEffect(() => {
     const selectedNums = selectedTickets.map((t) => t.number);
-    emitSelectTickets(player.first_name || player.username || 'Player', selectedNums, stake);
+    const myName = player.first_name || player.username || 'Player';
+    emitSelectTickets(myName, selectedNums, stake);
   }, [tickets, player, stake]);
 
   // Listen to Socket.IO real-time room updates
   useEffect(() => {
     const handleRoomState = (state: RoomState) => {
-      setTimerSeconds(state.timerSeconds);
+      if (typeof state.timerSeconds === 'number') setTimerSeconds(state.timerSeconds);
       if (state.playersCount) setRealPlayersCount(state.playersCount);
       if (state.derash) setRealDerash(state.derash);
+      if (state.reservedTickets) setReservedTicketsMap(state.reservedTickets);
 
-      if ((state.phase === 'PLAYING' || state.timerSeconds === 0) && !timerExpiredRef.current) {
-        timerExpiredRef.current = true;
+      if (state.phase === 'PLAYING') {
         onTimerExpired();
       }
     };
@@ -66,25 +67,10 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
     }
   }, [tickets]);
 
-  // Fallback local timer countdown if socket disconnects briefly
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimerSeconds((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  // Handle timer expiration safely in effect
-  useEffect(() => {
-    if (timerSeconds === 0 && !timerExpiredRef.current) {
-      timerExpiredRef.current = true;
-      onTimerExpired();
-    }
-  }, [timerSeconds, onTimerExpired]);
+  const currentUserName = player.first_name || player.username || 'Player';
 
   return (
-    <div className="flex-1 flex flex-col max-w-md mx-auto w-full px-3 pt-3 pb-20 text-white">
+    <div className="flex-1 flex flex-col max-w-md mx-auto w-full px-3 pt-3 pb-6 text-white">
       {/* Navigation Header */}
       <div className="flex items-center justify-between py-2 mb-2">
         <button
@@ -104,50 +90,63 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
         </button>
       </div>
 
-      {/* Top 4-Stats Bar */}
-      <div className="grid grid-cols-4 gap-1.5 bg-[#181d30] border border-slate-800 p-2 rounded-2xl mb-3 text-center">
-        <div className="bg-slate-900/60 p-1.5 rounded-xl border border-slate-800">
+      {/* Top Stats Bar */}
+      <div className="grid grid-cols-4 gap-2 bg-[#181d30] border border-slate-800 p-2.5 rounded-2xl mb-3 text-center">
+        <div className="bg-slate-900/65 p-1.5 rounded-xl border border-slate-800 flex flex-col justify-center">
           <div className="text-[9px] text-slate-400 font-semibold uppercase">WALLET</div>
-          <div className="text-xs font-bold text-slate-100">{player.mainWallet} ETB</div>
+          <div className="text-[11px] font-bold text-slate-100 truncate">{player.mainWallet + player.playWallet} ETB</div>
         </div>
 
-        <div className="bg-slate-900/60 p-1.5 rounded-xl border border-slate-800">
+        <div className="bg-slate-900/65 p-1.5 rounded-xl border border-slate-800 flex flex-col justify-center">
           <div className="text-[9px] text-slate-400 font-semibold uppercase">TICKETS</div>
           <div className="text-xs font-bold text-emerald-400">{selectedTickets.length}</div>
         </div>
 
-        <div className="bg-slate-900/60 p-1.5 rounded-xl border border-slate-800">
+        <div className="bg-slate-900/65 p-1.5 rounded-xl border border-slate-800 flex flex-col justify-center">
           <div className="text-[9px] text-slate-400 font-semibold uppercase">STAKE</div>
-          <div className="text-xs font-bold text-amber-400">
-            {selectedTickets.length > 0 ? selectedTickets.length * 10 : 10} ETB
+          <div className="text-[11px] font-bold text-amber-400 truncate">
+            {selectedTickets.length * stake} ETB
           </div>
         </div>
 
-        <div className="bg-slate-900/60 p-1.5 rounded-xl border border-slate-800">
-          <div className="text-[9px] text-amber-400 font-semibold uppercase">TIMER</div>
-          <div className="text-xs font-bold text-amber-400">{timerSeconds}s</div>
+        <div className="bg-amber-500/10 p-1.5 rounded-xl border border-amber-500/30 flex flex-col justify-center animate-pulse">
+          <div className="text-[9px] text-amber-400 font-bold uppercase">TIMER</div>
+          <div className="text-xs font-black text-amber-300">
+            {timerSeconds}s
+          </div>
         </div>
       </div>
 
-      {/* 1..88 Ticket Grid */}
-      <div className="bg-[#181d30] border border-slate-800 rounded-2xl p-2.5 max-h-[280px] overflow-y-auto mb-3">
+      {/* 1..400 Ticket Grid */}
+      <div className="bg-[#181d30] border border-slate-800 rounded-2xl p-2.5 max-h-[260px] overflow-y-auto mb-3">
         <div className="grid grid-cols-8 gap-1.5">
           {tickets.map((ticket) => {
             const isSelected = ticket.selected;
+            const reservedOwner = reservedTicketsMap[ticket.number];
+            const isTakenByOther = Boolean(reservedOwner && reservedOwner !== currentUserName && !isSelected);
+
             return (
               <button
                 key={ticket.number}
-                onClick={() => onToggleTicket(ticket.number)}
+                disabled={isTakenByOther}
+                onClick={() => !isTakenByOther && onToggleTicket(ticket.number)}
+                title={isTakenByOther ? `Taken by ${reservedOwner}` : `Ticket #${ticket.number}`}
                 className={`
-                  aspect-square rounded-lg flex items-center justify-center font-bold text-xs transition-colors cursor-pointer select-none
+                  aspect-square rounded-lg flex flex-col items-center justify-center font-bold text-xs transition-colors cursor-pointer select-none relative
                   ${
-                    isSelected
-                      ? 'bg-amber-500 text-slate-950 font-black border border-amber-300'
+                    isTakenByOther
+                      ? 'bg-slate-900/90 text-slate-600 border border-slate-800/80 cursor-not-allowed opacity-50'
+                      : isSelected
+                      ? 'bg-amber-500 text-slate-950 font-black border border-amber-300 shadow-sm scale-105'
                       : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60'
                   }
                 `}
               >
-                {ticket.number}
+                {isTakenByOther ? (
+                  <Lock className="w-3 h-3 text-red-400/70" />
+                ) : (
+                  ticket.number
+                )}
               </button>
             );
           })}
@@ -155,7 +154,7 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
       </div>
 
       {/* Selected Cartel Preview Area (White Cartel Card + Colorful B-I-N-G-O Header) */}
-      <div className="w-full bg-[#181d30] border border-slate-800 rounded-2xl p-2.5 shadow-xl flex flex-col items-center justify-center min-h-[220px] mb-3">
+      <div className="w-full bg-[#181d30] border border-slate-800 rounded-2xl p-2.5 shadow-xl flex flex-col items-center justify-center min-h-[210px]">
         {activePreviewCartel ? (
           <div className="w-full flex flex-col items-center gap-1.5">
             <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/30">
@@ -163,7 +162,7 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
             </span>
 
             {/* White Cartel Card */}
-            <div className="w-full max-w-[210px] bg-white p-2 rounded-2xl shadow-lg border border-slate-200">
+            <div className="w-full max-w-[200px] bg-white p-2 rounded-xl shadow-lg border border-slate-200">
               <div className="grid grid-cols-5 gap-1">
                 {[
                   { letter: 'B', color: 'bg-blue-600 text-white' },
@@ -174,7 +173,7 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
                 ].map((item) => (
                   <div
                     key={item.letter}
-                    className={`${item.color} font-black text-center py-0.5 text-[10px] rounded uppercase shadow-sm`}
+                    className={`${item.color} font-black text-center py-0.5 text-[9px] rounded uppercase shadow-sm`}
                   >
                     {item.letter}
                   </div>
@@ -183,14 +182,14 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
                   row.map((cell, cIdx) => (
                     <div
                       key={`${rIdx}-${cIdx}`}
-                      className={`aspect-square font-bold text-[11px] flex items-center justify-center rounded border ${
+                      className={`aspect-square font-bold text-[10px] flex items-center justify-center rounded border ${
                         cell.number === 'FREE'
                           ? 'bg-teal-500 text-white font-black border-teal-600'
                           : 'bg-slate-100 text-slate-900 border-slate-200'
                       }`}
                     >
                       {cell.number === 'FREE' ? (
-                        <span className="text-white text-[9px]">★</span>
+                        <span className="text-white text-[8px]">★</span>
                       ) : (
                         cell.number
                       )}
@@ -206,22 +205,7 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
           </div>
         )}
       </div>
-
-      {/* Auto Start Timer Footer */}
-      <div className="w-full bg-slate-900/80 border border-slate-800 rounded-2xl p-3 text-center flex flex-col items-center gap-1">
-        <div className="flex items-center gap-2 text-xs font-bold text-amber-400">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-          </span>
-          <span>Game Starts Automatically</span>
-        </div>
-        <p className="text-[11px] text-slate-400">
-          {selectedTickets.length > 0
-            ? `Entering match with ${selectedTickets.length} ticket(s) in ${timerSeconds}s...`
-            : `Select your ticket numbers above before timer (${timerSeconds}s) expires.`}
-        </p>
-      </div>
     </div>
   );
 };
+

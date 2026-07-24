@@ -19,46 +19,56 @@ export function getStoredPlayer(): Player {
   const tgUser = getTelegramUser();
   const stored = localStorage.getItem(PLAYER_KEY);
 
+  let playerObj: Player;
+
   if (stored) {
     try {
-      const parsed = JSON.parse(stored);
+      playerObj = JSON.parse(stored);
       if (tgUser) {
-        parsed.username = tgUser.username || parsed.username;
-        parsed.first_name = tgUser.first_name || parsed.first_name;
-        parsed.telegram_id = tgUser.id;
+        playerObj.username = tgUser.username || playerObj.username;
+        playerObj.first_name = tgUser.first_name || playerObj.first_name;
+        playerObj.telegram_id = tgUser.id;
+        playerObj.id = `tg-${tgUser.id}`;
       }
-      return parsed;
     } catch (e) {
-      // Fallback
+      playerObj = {
+        id: tgUser ? `tg-${tgUser.id}` : 'player-real-1',
+        telegram_id: tgUser?.id,
+        username: tgUser?.username || 'real_player',
+        first_name: tgUser?.first_name || 'Player',
+        mainWallet: 200,
+        playWallet: 50,
+        created_at: new Date().toISOString(),
+      };
     }
+  } else {
+    playerObj = {
+      id: tgUser ? `tg-${tgUser.id}` : 'player-real-1',
+      telegram_id: tgUser?.id,
+      username: tgUser?.username || 'real_player',
+      first_name: tgUser?.first_name || 'Player',
+      mainWallet: 200,
+      playWallet: 50,
+      created_at: new Date().toISOString(),
+    };
   }
 
-  const newPlayer: Player = {
-    id: tgUser ? `tg-${tgUser.id}` : 'player-real-1',
-    telegram_id: tgUser?.id,
-    username: tgUser?.username || 'real_player',
-    first_name: tgUser?.first_name || 'Player',
-    mainWallet: 200,
-    playWallet: 50,
-    created_at: new Date().toISOString(),
-  };
-
-  savePlayer(newPlayer);
+  savePlayer(playerObj);
   
-  // Sync new player with backend
+  // Sync player to MongoDB backend
   try {
     fetch('/api/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        telegramId: newPlayer.id,
-        name: newPlayer.first_name,
-        username: newPlayer.username,
+        telegramId: playerObj.id,
+        name: playerObj.first_name,
+        username: playerObj.username,
       }),
     }).catch(() => {});
   } catch (e) {}
 
-  return newPlayer;
+  return playerObj;
 }
 
 export function savePlayer(player: Player): void {
@@ -92,8 +102,7 @@ export function updateBalance(
   } catch (e) {}
 
   // Add transaction
-  const transactions = getTransactions();
-  transactions.unshift({
+  const newTx: Transaction = {
     id: `tx-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     playerId: player.id,
     type,
@@ -101,9 +110,21 @@ export function updateBalance(
     status: 'completed',
     createdAt: new Date().toISOString(),
     description,
-  });
+  };
 
+  const transactions = getTransactions();
+  transactions.unshift(newTx);
   localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(transactions));
+
+  // Sync transaction to MongoDB backend
+  try {
+    fetch('/api/transactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newTx),
+    }).catch(() => {});
+  } catch (e) {}
+
   return updatedPlayer;
 }
 
@@ -124,9 +145,29 @@ export function addGameHistory(entry: GameHistoryEntry): void {
   history.unshift(entry);
   localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
 
+  const player = getStoredPlayer();
+
+  // Sync history to MongoDB backend
+  try {
+    fetch('/api/history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: entry.id,
+        playerId: player.id,
+        gameId: entry.gameId,
+        date: entry.date,
+        stake: entry.stake,
+        ticketsCount: entry.ticketsCount,
+        potWon: entry.potWon,
+        status: entry.status,
+        pattern: entry.pattern,
+      }),
+    }).catch(() => {});
+  } catch (e) {}
+
   // Update real player score stats if WON
   if (entry.status === 'WON') {
-    const player = getStoredPlayer();
     const scores = getScoresLeaderboard();
     const existingIndex = scores.findIndex((s) => s.id === player.id);
     if (existingIndex >= 0) {
@@ -190,4 +231,24 @@ export function getScoresLeaderboard(): ScoreEntry[] {
   }
 
   return [];
+}
+
+export async function syncPlayerProfile(playerId: string): Promise<Player | null> {
+  try {
+    const res = await fetch(`/api/users/${playerId}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.success && data.user) {
+      const local = getStoredPlayer();
+      const synced: Player = {
+        ...local,
+        mainWallet: data.user.balance !== undefined ? data.user.balance : local.mainWallet,
+      };
+      savePlayer(synced);
+      return synced;
+    }
+  } catch (e) {
+    console.error('Failed to sync player profile with backend:', e);
+  }
+  return null;
 }

@@ -64,7 +64,11 @@ class BingoGameManager {
   }
 
   public getRealPlayersCount(): number {
-    return Math.max(this.players.size, 1);
+    const activePlayersWithTickets = Array.from(this.players.values()).filter(
+      (p) => p.selectedTickets && p.selectedTickets.length > 0
+    ).length;
+    const connectedClients = this.io ? this.io.engine.clientsCount : 0;
+    return Math.max(activePlayersWithTickets, connectedClients, 1);
   }
 
   public getTotalStakedTickets(): number {
@@ -76,17 +80,25 @@ class BingoGameManager {
   }
 
   public getCalculateDerash(): number {
-    let totalPool = 0;
+    let activeStake = 10;
     this.players.forEach((p) => {
-      const stake = p.stake || 10;
-      const count = p.selectedTickets ? p.selectedTickets.length : 0;
-      totalPool += count * stake;
+      if (p.stake) {
+        activeStake = p.stake;
+      }
     });
+    return activeStake * 8;
+  }
 
-    if (totalPool === 0) return 0;
-
-    // Exact 85% payout pool from total tickets staked
-    return Math.round(totalPool * 0.85);
+  public getReservedTicketsMap(): Record<number, string> {
+    const reserved: Record<number, string> = {};
+    this.players.forEach((p) => {
+      if (p.selectedTickets && Array.isArray(p.selectedTickets)) {
+        p.selectedTickets.forEach((tNum) => {
+          reserved[tNum] = p.username || 'Player';
+        });
+      }
+    });
+    return reserved;
   }
 
   public startSelectionPhase() {
@@ -105,13 +117,20 @@ class BingoGameManager {
 
     if (this.intervalTimer) clearInterval(this.intervalTimer);
 
+    // Broadcast initial 35s state immediately
+    this.broadcastRoomState();
+
     this.intervalTimer = setInterval(() => {
       if (this.timerSeconds > 0) {
         this.timerSeconds--;
         this.broadcastRoomState();
       } else {
         if (this.intervalTimer) clearInterval(this.intervalTimer);
-        this.startPlayingPhase();
+        if (this.getTotalStakedTickets() > 0) {
+          this.startPlayingPhase();
+        } else {
+          this.startSelectionPhase();
+        }
       }
     }, 1000);
   }
@@ -157,8 +176,15 @@ class BingoGameManager {
   public handleBingoClaim(socketId: string, claimData: { username: string; cartel: any; pattern: string }) {
     if (this.phase !== 'PLAYING' || this.winnerInfo) return;
 
+    // Verify player actually bought/selected tickets before claiming BINGO
+    const player = this.players.get(socketId);
+    if (!player || !player.selectedTickets || player.selectedTickets.length === 0) {
+      console.log(`[Socket.IO] Blocked BINGO claim from socket ${socketId}: No tickets held.`);
+      return;
+    }
+
     this.winnerInfo = {
-      winnerName: claimData.username || 'You',
+      winnerName: claimData.username || player.username || 'You',
       cartel: claimData.cartel,
       prize: this.getCalculateDerash(),
       pattern: claimData.pattern || 'BINGO',
@@ -193,6 +219,7 @@ class BingoGameManager {
       gameId: this.gameId,
       calledBalls: this.calledBalls,
       currentBall: this.currentBall,
+      reservedTickets: this.getReservedTicketsMap(),
       winnerInfo: this.winnerInfo,
     });
   }
@@ -210,7 +237,30 @@ class BingoGameManager {
       gameId: this.gameId,
       calledBalls: this.calledBalls,
       currentBall: this.currentBall,
+      reservedTickets: this.getReservedTicketsMap(),
       winnerInfo: this.winnerInfo,
+    });
+
+    socket.on('join_game', (data: { username: string; selectedTickets: number[]; stake: number }) => {
+      if (!data.selectedTickets || !Array.isArray(data.selectedTickets) || data.selectedTickets.length === 0) {
+        socket.emit('error_message', { message: 'ወደ ጨዋታው ለመግባት ቢያንስ 1 ቲኬት መግዛት አለብዎት!' });
+        return;
+      }
+
+      this.players.set(socket.id, {
+        socketId: socket.id,
+        username: data.username || 'Player',
+        selectedTickets: data.selectedTickets,
+        stake: data.stake || 10,
+      });
+
+      if (data.username) {
+        findOrCreateUser(socket.id, data.username, data.username).catch((e) =>
+          console.error('Error finding/creating user in MongoDB:', e)
+        );
+      }
+
+      this.broadcastRoomState();
     });
 
     socket.on('select_tickets', (data: { username: string; selectedTickets: number[]; stake: number }) => {

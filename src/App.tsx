@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavTab, GameStage, Player, TicketItem } from './types';
 import { generateTicketList } from './lib/bingo';
-import { getStoredPlayer, updateBalance, addGameHistory } from './lib/storage';
+import { getStoredPlayer, updateBalance, addGameHistory, syncPlayerProfile } from './lib/storage';
 import { BottomNav } from './components/BottomNav';
 import { PageHome } from './components/PageHome';
 import { PageTicketSelect } from './components/PageTicketSelect';
@@ -19,6 +19,7 @@ export const App: React.FC = () => {
   // Navigation & Game Stage
   const [activeTab, setActiveTab] = useState<NavTab>('GAME');
   const [gameStage, setGameStage] = useState<GameStage>('HOME');
+  const [roomPhase, setRoomPhase] = useState<'TICKET_SELECT' | 'PLAYING' | 'WINNER_SHOW'>('TICKET_SELECT');
 
   // Player & Wallet State
   const [player, setPlayer] = useState<Player>({
@@ -44,27 +45,48 @@ export const App: React.FC = () => {
   });
   const [transactionsOpen, setTransactionsOpen] = useState<boolean>(false);
 
+  const alertShownRef = useRef<boolean>(false);
+  const ticketsRef = useRef(tickets);
+  useEffect(() => {
+    ticketsRef.current = tickets;
+  }, [tickets]);
+
   // Load Telegram user or default on mount
   useEffect(() => {
     const p = getStoredPlayer();
     setPlayer(p);
+
+    // Sync profile and balance from MongoDB Atlas
+    syncPlayerProfile(p.id)
+      .then((synced) => {
+        if (synced) {
+          setPlayer(synced);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Synchronize room state across Socket.IO
   useEffect(() => {
     const handleRoomState = (state: RoomState) => {
+      if (state.phase) {
+        setRoomPhase(state.phase);
+      }
       if (state.gameId && state.gameId !== gameId) {
         setGameId(state.gameId);
         // Clear selected tickets for new game ID
         setTickets((prev) => prev.map((t) => ({ ...t, selected: false })));
       }
       if (state.phase === 'PLAYING' && activeTab === 'GAME' && gameStage === 'TICKET_SELECT') {
-        setGameStage('PLAYING');
+        const selected = ticketsRef.current.filter((t) => t.selected);
+        if (selected.length > 0) {
+          handleStartLiveGame();
+        }
       } else if (state.phase === 'TICKET_SELECT') {
+        alertShownRef.current = false;
         if (gameStage === 'PLAYING') {
           setGameStage('TICKET_SELECT');
         }
-        setTickets((prev) => prev.map((t) => ({ ...t, selected: false })));
       }
     };
 
@@ -77,6 +99,29 @@ export const App: React.FC = () => {
 
   // Handle Ticket Toggle
   const handleToggleTicket = (ticketNum: number) => {
+    const targetTicket = tickets.find((t) => t.number === ticketNum);
+    if (!targetTicket) return;
+
+    if (!targetTicket.selected) {
+      if (player.mainWallet + player.playWallet < selectedStake) {
+        alert(`የቦርሳዎ ሂሳብ በቂ አይደለም! ቲኬት ለመምረጥ ${selectedStake} ETB ያስፈልጋል።`);
+        return;
+      }
+      const updated = updateBalance(
+        -selectedStake,
+        'stake',
+        `Ticket #${ticketNum} Stake (-${selectedStake} ETB)`
+      );
+      setPlayer(updated);
+    } else {
+      const updated = updateBalance(
+        selectedStake,
+        'refund',
+        `Ticket #${ticketNum} Deselected (+${selectedStake} ETB)`
+      );
+      setPlayer(updated);
+    }
+
     setTickets((prev) =>
       prev.map((t) => (t.number === ticketNum ? { ...t, selected: !t.selected } : t))
     );
@@ -84,39 +129,36 @@ export const App: React.FC = () => {
 
   // Handle Refresh Tickets
   const handleRefreshTickets = () => {
+    const selected = tickets.filter((t) => t.selected);
+    if (selected.length > 0) {
+      const refundAmount = selected.length * selectedStake;
+      const updated = updateBalance(refundAmount, 'refund', `Refreshed tickets refund (+${refundAmount} ETB)`);
+      setPlayer(updated);
+    }
     setTickets(generateTicketList(400));
   };
 
-  // Transition from Home -> Ticket Selection
-  const handleStartTicketSelect = () => {
-    setGameStage('TICKET_SELECT');
+  // Transition from Home -> Game or Ticket Selection based on roomPhase
+  const handleStartGameAction = () => {
+    if (roomPhase === 'PLAYING') {
+      setGameStage('PLAYING');
+    } else {
+      setGameStage('TICKET_SELECT');
+    }
   };
 
   // Transition from Ticket Selection -> Live Game
   const handleStartLiveGame = async () => {
     const selected = tickets.filter((t) => t.selected);
-    const count = selected.length > 0 ? selected.length : 1;
-    const totalCost = count * selectedStake;
-
-    if (player.mainWallet + player.playWallet < totalCost) {
-      alert(`Insufficient balance! Need ${totalCost} ETB to play ${count} cartel(s).`);
+    
+    // Strict requirement: User MUST select at least 1 ticket to enter game!
+    if (selected.length === 0) {
+      alert('እባክዎ ወደ ጨዋታው ከመግባትዎ በፊት ቢያንስ 1 ቲኬት (ካርቴላ) ይምረጡ!');
       return;
     }
 
-    // Auto-select ticket 1 if user didn't pick any specific ticket
-    if (selected.length === 0) {
-      setTickets((prev) =>
-        prev.map((t) => (t.number === 1 ? { ...t, selected: true } : t))
-      );
-    }
-
-    // Deduct stake
-    const updated = updateBalance(
-      -totalCost,
-      'stake',
-      `Played ${count} Cartel(s) at ${selectedStake} ETB per cartel`
-    );
-    setPlayer(updated);
+    const count = selected.length;
+    const totalCost = count * selectedStake;
 
     // Generate random Game ID
     const randomGameId = 'DB' + Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -198,7 +240,7 @@ export const App: React.FC = () => {
               selectedStake={selectedStake}
               setSelectedStake={setSelectedStake}
               onOpenRules={() => setRulesOpen(true)}
-              onStartTicketSelect={handleStartTicketSelect}
+              onStartTicketSelect={handleStartGameAction}
               onQuickAddBonus={() => handleQuickAddBonus(100)}
             />
           )}
@@ -223,7 +265,7 @@ export const App: React.FC = () => {
               selectedTickets={selectedTicketsList.length > 0 ? selectedTicketsList : [tickets[0]]}
               onLeaveGame={() => {
                 setTickets((prev) => prev.map((t) => ({ ...t, selected: false })));
-                setGameStage('TICKET_SELECT');
+                setGameStage('HOME');
               }}
               onWin={handleGameWin}
               soundEnabled={soundEnabled}

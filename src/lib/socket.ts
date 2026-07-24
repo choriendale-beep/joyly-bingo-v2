@@ -10,6 +10,7 @@ export interface RoomState {
   gameId: string;
   calledBalls: CalledBall[];
   currentBall: CalledBall | null;
+  reservedTickets?: Record<number, string>;
   winnerInfo: {
     winnerName: string;
     cartel: any;
@@ -27,6 +28,12 @@ export const socket: Socket = io({
 export function emitSelectTickets(username: string, selectedTickets: number[], stake: number) {
   if (socket.connected) {
     socket.emit('select_tickets', { username, selectedTickets, stake });
+  }
+}
+
+export function emitJoinGame(username: string, selectedTickets: number[], stake: number) {
+  if (socket.connected && selectedTickets && selectedTickets.length > 0) {
+    socket.emit('join_game', { username, selectedTickets, stake });
   }
 }
 
