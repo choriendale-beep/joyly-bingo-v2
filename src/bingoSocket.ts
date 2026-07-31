@@ -166,8 +166,8 @@ class BingoGameManager {
   }
 
   public getCalculateDerash(): number {
-    if ((this.phase === 'PLAYING' || this.phase === 'WINNER_SHOW') && this.lockedDerash > 0) {
-      return this.lockedDerash;
+    if (this.phase === 'PLAYING' || this.phase === 'WINNER_SHOW') {
+      return this.lockedDerash > 0 ? this.lockedDerash : 8;
     }
     let derashTotal = 0;
     this.players.forEach((p) => {
@@ -269,7 +269,7 @@ class BingoGameManager {
     });
 
     this.lockedPlayersCount = Math.max(1, ticketSockets.size);
-    this.lockedDerash = Math.round(totalDerash * 100) / 100;
+    this.lockedDerash = totalDerash > 0 ? Math.round(totalDerash * 100) / 100 : 8;
 
     this.broadcastRoomState();
     this.io.emit('game_start', {

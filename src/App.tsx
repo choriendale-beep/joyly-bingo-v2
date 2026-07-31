@@ -313,10 +313,8 @@ export const App: React.FC = () => {
               stake={selectedStake}
               selectedTickets={selectedTicketsList}
               onLeaveGame={() => {
-                if (roomPhase === 'TICKET_SELECT') {
-                  setTickets((prev) => prev.map((t) => ({ ...t, selected: false })));
-                }
-                setGameStage('HOME');
+                setTickets((prev) => prev.map((t) => ({ ...t, selected: false })));
+                setGameStage('TICKET_SELECT');
               }}
               onWin={handleGameWin}
               soundEnabled={soundEnabled}

@@ -19,8 +19,10 @@ export interface RoomState {
   } | null;
 }
 
-// Automatically connects to current host
-export const socket: Socket = io({
+// Automatically connects to VITE_BACKEND_URL (Render/Railway/VPS) or current window origin
+const SERVER_URL = (import.meta as any).env?.VITE_BACKEND_URL || undefined;
+
+export const socket: Socket = io(SERVER_URL, {
   transports: ['websocket', 'polling'],
   autoConnect: true,
 });

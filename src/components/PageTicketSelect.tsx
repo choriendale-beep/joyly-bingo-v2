@@ -38,10 +38,15 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
     emitSelectTickets(myName, selectedNums, stake);
   }, [tickets, player, stake]);
 
-  // Local fallback 35-second timer countdown
+  // Local fallback timer countdown (counts down smoothly to 0 without resetting to 35 on its own)
   useEffect(() => {
     const timerInterval = setInterval(() => {
-      setTimerSeconds((prev) => (prev <= 1 ? 35 : prev - 1));
+      setTimerSeconds((prev) => {
+        if (prev <= 1) {
+          return 0; // Hold smoothly at 0 until game transitions or server resets timer
+        }
+        return prev - 1;
+      });
     }, 1000);
 
     return () => clearInterval(timerInterval);
@@ -109,21 +114,29 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
         </div>
 
         <div className="bg-slate-900/65 p-1.5 rounded-xl border border-slate-800 flex flex-col justify-center">
-          <div className="text-[9px] text-slate-400 font-semibold uppercase">BALANCE</div>
-          <div className="text-[11px] font-bold text-emerald-400 truncate">{player.balance} ETB</div>
-        </div>
-
-        <div className="bg-slate-900/65 p-1.5 rounded-xl border border-slate-800 flex flex-col justify-center">
-          <div className="text-[9px] text-amber-400 font-semibold uppercase">STAKE</div>
-          <div className="text-[11px] font-bold text-amber-400 truncate">
+          <div className="text-[9px] text-slate-400 font-semibold uppercase">STAKE</div>
+          <div className="text-[11px] font-bold text-amber-300 truncate">
             {selectedTickets.length * stake} ETB
           </div>
         </div>
 
-        <div className="bg-amber-500/10 p-1.5 rounded-xl border border-amber-500/30 flex flex-col justify-center animate-pulse">
-          <div className="text-[9px] text-amber-400 font-bold uppercase">TIMER</div>
-          <div className="text-xs font-black text-amber-300">
-            {timerSeconds}s
+        <div className="bg-slate-900/65 p-1.5 rounded-xl border border-slate-800 flex flex-col justify-center">
+          <div className="text-[9px] text-slate-400 font-semibold uppercase">BALANCE</div>
+          <div className="text-[11px] font-bold text-emerald-400 truncate">{player.balance} ETB</div>
+        </div>
+
+        <div className={`p-1.5 rounded-xl border flex flex-col justify-center transition-all ${
+          timerSeconds <= 5 && timerSeconds > 0
+            ? 'bg-red-500/20 border-red-500/50 text-red-400 animate-pulse'
+            : timerSeconds === 0
+            ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
+            : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+        }`}>
+          <div className="text-[9px] font-bold uppercase">
+            {timerSeconds === 0 ? 'STATUS' : 'TIMER'}
+          </div>
+          <div className="text-xs font-black">
+            {timerSeconds === 0 ? 'STARTING...' : `${timerSeconds}s`}
           </div>
         </div>
       </div>
@@ -202,55 +215,77 @@ export const PageTicketSelect: React.FC<PageTicketSelectProps> = ({
         )}
       </div>
 
-      {/* Selected Cartel Preview Area (White Cartel Card + Colorful B-I-N-G-O Header) */}
-      <div className="w-full bg-[#181d30] border border-slate-800 rounded-2xl p-2.5 shadow-xl flex flex-col items-center justify-center min-h-[210px]">
-        {activePreviewCartel ? (
-          <div className="w-full flex flex-col items-center gap-1.5">
-            <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/30">
-              TICKET #{activePreviewCartel.ticketNumber}
-            </span>
+      {/* Selected Cartel Preview Area (White Cartel Card + Colorful B-I-N-G-O Header with Vertical Scrolling) */}
+      <div className="w-full bg-[#181d30] border border-slate-800 rounded-2xl p-2.5 shadow-xl flex flex-col items-center justify-center min-h-[220px]">
+        {selectedTickets.length > 0 ? (
+          <div className="w-full flex flex-col gap-2">
+            <div className="flex items-center justify-between text-[10px] font-bold text-amber-400 px-1">
+              <span>የተመረጡ ካርቴላዎች ({selectedTickets.length}):</span>
+              {selectedTickets.length > 1 && (
+                <span className="text-slate-400 text-[9px] animate-pulse">ወደላይ/ወደታች ↕</span>
+              )}
+            </div>
 
-            {/* White Cartel Card */}
-            <div className="w-full max-w-[160px] bg-white p-1.5 rounded-xl shadow-md border border-slate-200">
-              <div className="grid grid-cols-5 gap-0.5">
-                {[
-                  { letter: 'B', color: 'bg-blue-600 text-white' },
-                  { letter: 'I', color: 'bg-indigo-600 text-white' },
-                  { letter: 'N', color: 'bg-fuchsia-600 text-white' },
-                  { letter: 'G', color: 'bg-teal-600 text-white' },
-                  { letter: 'O', color: 'bg-orange-600 text-white' },
-                ].map((item) => (
+            {/* Vertical Scrolling Container for Cartels */}
+            <div className="flex flex-col items-center gap-3 py-1 px-1 overflow-y-auto max-h-[320px] scrollbar-thin scrollbar-thumb-amber-500/50 w-full">
+              {selectedTickets.map((ticketItem) => {
+                const cartel = ticketItem.cartel || activePreviewCartel;
+                if (!cartel) return null;
+
+                return (
                   <div
-                    key={item.letter}
-                    className={`${item.color} font-black text-center py-0.5 text-[8px] rounded uppercase shadow-sm`}
+                    key={ticketItem.number}
+                    className="flex flex-col items-center gap-1 bg-white/5 border border-slate-700/60 p-2 rounded-xl w-full max-w-[170px]"
                   >
-                    {item.letter}
-                  </div>
-                ))}
-                {activePreviewCartel.grid.map((row, rIdx) =>
-                  row.map((cell, cIdx) => (
-                    <div
-                      key={`${rIdx}-${cIdx}`}
-                      className={`aspect-square font-bold text-[9px] flex items-center justify-center rounded border ${
-                        cell.number === 'FREE'
-                          ? 'bg-teal-500 text-white font-black border-teal-600'
-                          : 'bg-slate-100 text-slate-900 border-slate-200'
-                      }`}
-                    >
-                      {cell.number === 'FREE' ? (
-                        <span className="text-white text-[7px]">★</span>
-                      ) : (
-                        cell.number
-                      )}
+                    <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                      TICKET #{ticketItem.number}
+                    </span>
+
+                    {/* White Cartel Card */}
+                    <div className="w-[145px] sm:w-[155px] bg-white p-1.5 rounded-xl shadow-md border border-slate-200">
+                      <div className="grid grid-cols-5 gap-0.5">
+                        {[
+                          { letter: 'B', color: 'bg-blue-600 text-white' },
+                          { letter: 'I', color: 'bg-indigo-600 text-white' },
+                          { letter: 'N', color: 'bg-fuchsia-600 text-white' },
+                          { letter: 'G', color: 'bg-teal-600 text-white' },
+                          { letter: 'O', color: 'bg-orange-600 text-white' },
+                        ].map((item) => (
+                          <div
+                            key={item.letter}
+                            className={`${item.color} font-black text-center py-0.5 text-[8px] rounded uppercase shadow-sm`}
+                          >
+                            {item.letter}
+                          </div>
+                        ))}
+                        {cartel.grid.map((row, rIdx) =>
+                          row.map((cell, cIdx) => (
+                            <div
+                              key={`${rIdx}-${cIdx}`}
+                              className={`aspect-square font-bold text-[9px] flex items-center justify-center rounded border ${
+                                cell.number === 'FREE'
+                                  ? 'bg-teal-500 text-white font-black border-teal-600'
+                                  : 'bg-slate-100 text-slate-900 border-slate-200'
+                              }`}
+                            >
+                              {cell.number === 'FREE' ? (
+                                <span className="text-white text-[7px]">★</span>
+                              ) : (
+                                cell.number
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
                     </div>
-                  ))
-                )}
-              </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ) : (
           <div className="text-center py-6 text-xs text-slate-400">
-            Tap any ticket (1–400) above to select and view board
+            ከላይ ካርቴላዎችን (1–400) በመንካት ይምረጡና ይመልከቱ
           </div>
         )}
       </div>

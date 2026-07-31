@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TicketItem, CalledBall, Cartel, Player } from '../types';
 import { checkBingoWin } from '../lib/bingo';
-import { Volume2, VolumeX, RefreshCw, LogOut, CheckCircle2, Crown, Eye } from 'lucide-react';
+import { Volume2, VolumeX, RefreshCw, LogOut, CheckCircle2, Crown, Eye, SlidersHorizontal } from 'lucide-react';
 import { socket, emitClaimBingo, emitJoinGame, emitSpectateGame, RoomState } from '../lib/socket';
+import { playNumberSound } from '../lib/audioHelper';
+import { SoundSettingsModal } from './SoundSettingsModal';
 
 interface CartelCardProps {
   cartel: Cartel;
@@ -22,16 +24,16 @@ const CartelCard: React.FC<CartelCardProps> = React.memo(({
   isSpectator,
 }) => {
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-1.5 flex flex-col gap-1 shrink-0 shadow-md text-slate-900 max-w-[170px] mx-auto w-full">
-      <div className="text-center text-[9px] font-black text-amber-600 uppercase tracking-widest">
+    <div className="bg-white border border-slate-200 rounded-xl p-1 flex flex-col gap-0.5 shrink-0 shadow-md text-slate-900 max-w-[145px] mx-auto w-full">
+      <div className="text-center text-[8px] font-black text-amber-600 uppercase tracking-widest">
         TICKET NO #{cartel.ticketNumber}
       </div>
 
-      <div className="grid grid-cols-5 gap-0.5 bg-slate-100 p-1 rounded-lg border border-slate-200">
+      <div className="grid grid-cols-5 gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
         {['B', 'I', 'N', 'G', 'O'].map((letter, i) => (
           <div
             key={letter}
-            className={`${headerColors[i]} font-black text-center py-0.5 text-[9px] rounded uppercase shadow-sm`}
+            className={`${headerColors[i]} font-black text-center py-0.5 text-[8px] rounded uppercase shadow-sm`}
           >
             {letter}
           </div>
@@ -48,7 +50,7 @@ const CartelCard: React.FC<CartelCardProps> = React.memo(({
                 key={`${rIdx}-${cIdx}`}
                 onClick={() => !isSpectator && onCellClick(cartelIndex, rIdx, cIdx)}
                 className={`
-                  aspect-square rounded flex items-center justify-center font-black text-[10px] transition-all cursor-pointer select-none shadow-sm border
+                  aspect-square rounded flex items-center justify-center font-black text-[9px] transition-all cursor-pointer select-none shadow-sm border
                   ${
                     isFree
                       ? 'bg-teal-500 text-white font-black border-teal-600'
@@ -111,6 +113,7 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
     pattern: string;
   } | null>(null);
   const [winnerTimer, setWinnerTimer] = useState<number>(5);
+  const [isSoundModalOpen, setIsSoundModalOpen] = useState<boolean>(false);
 
   // Real synchronized players count & Derash from Socket.IO server
   const [playersCount, setPlayersCount] = useState<number>(1);
@@ -147,21 +150,32 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
     }
   };
 
+  const activeCartelsRef = useRef<Cartel[]>(activeCartels);
+  activeCartelsRef.current = activeCartels;
+
+  const isAutomaticRef = useRef<boolean>(isAutomatic);
+  isAutomaticRef.current = isAutomatic;
+
+  const derashRef = useRef<number>(derash);
+  derashRef.current = derash;
+
   // Socket.IO Listener for real-time Synchronized Ball Calling
   useEffect(() => {
     const handleBallCalled = (data: { currentBall: CalledBall; calledBalls: CalledBall[] }) => {
       if (data.currentBall) {
         setCurrentBall(data.currentBall);
-        playBeep(450 + (data.currentBall.number % 15) * 15);
+        playNumberSound(data.currentBall, soundEnabled);
       }
       if (data.calledBalls) {
         setCalledBalls(data.calledBalls);
 
         // Auto-daub active cartels for ticket holders
-        if (isAutomatic && data.currentBall && activeCartels.length > 0) {
+        if (isAutomaticRef.current && data.currentBall && activeCartelsRef.current.length > 0) {
           const ballNum = data.currentBall.number;
-          setActiveCartels((prevCartels) =>
-            prevCartels.map((cartel) => {
+          const calledNums = new Set([...data.calledBalls.map((b) => b.number), ballNum]);
+
+          setActiveCartels((prevCartels) => {
+            const updatedCartels = prevCartels.map((cartel) => {
               const newGrid = cartel.grid.map((row) =>
                 row.map((cell) => {
                   if (typeof cell.number === 'number' && cell.number === ballNum) {
@@ -171,8 +185,22 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
                 })
               );
               return { ...cartel, grid: newGrid };
-            })
-          );
+            });
+
+            // Instant auto win check
+            if (!winHandledRef.current) {
+              for (const cartel of updatedCartels) {
+                const winRes = checkBingoWin(cartel.grid, calledNums);
+                if (winRes.isWin) {
+                  const winnerName = player.first_name || player.username || 'You';
+                  emitClaimBingo(winnerName, cartel, winRes.pattern || 'BINGO');
+                  break;
+                }
+              }
+            }
+
+            return updatedCartels;
+          });
         }
       }
     };
@@ -183,9 +211,9 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
           winnerName: data.winnerInfo.winnerName,
           username: data.winnerInfo.username,
           winnerSocketId: data.winnerInfo.winnerSocketId,
-          cartel: data.winnerInfo.cartel || activeCartels[0] || { grid: [], ticketNumber: 1 },
+          cartel: data.winnerInfo.cartel || activeCartelsRef.current[0] || { grid: [], ticketNumber: 1 },
           ticketNumber: data.winnerInfo.ticketNumber || data.winnerInfo.cartel?.ticketNumber,
-          prize: data.winnerInfo.prize || derash,
+          prize: data.winnerInfo.prize || derashRef.current,
           pattern: data.winnerInfo.pattern || 'BINGO',
         };
         setWinningInfo(info);
@@ -197,7 +225,7 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
 
         if (isMe && !winHandledRef.current) {
           winHandledRef.current = true;
-          onWin(data.winnerInfo.prize || derash, data.winnerInfo.pattern || 'BINGO');
+          onWin(data.winnerInfo.prize || derashRef.current, data.winnerInfo.pattern || 'BINGO');
         }
       }
     };
@@ -211,10 +239,10 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
 
     const handleRoomState = (state: RoomState) => {
       if (typeof state.playersCount === 'number') setPlayersCount(state.playersCount);
-      if (typeof state.derash === 'number') setDerash(state.derash);
+      if (typeof state.derash === 'number' && state.derash > 0) setDerash(state.derash);
       if (state.calledBalls && state.calledBalls.length > 0) {
         setCalledBalls(state.calledBalls);
-        if (isAutomatic && activeCartels.length > 0) {
+        if (isAutomaticRef.current && activeCartelsRef.current.length > 0) {
           const calledNums = new Set(state.calledBalls.map((b) => b.number));
           setActiveCartels((prevCartels) =>
             prevCartels.map((cartel) => {
@@ -268,7 +296,7 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
       socket.off('room_state', handleRoomState);
       socket.off('reset_to_lobby', handleResetToLobby);
     };
-  }, [isAutomatic, activeCartels, derash, selectedTickets, player, stake, onLeaveGame]);
+  }, [soundEnabled, selectedTickets, player, stake, onLeaveGame, onWin]);
 
   // Check win condition locally and broadcast claim to socket
   useEffect(() => {
@@ -363,9 +391,9 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
           <div className="text-xs font-bold text-slate-200">{stake} ETB</div>
         </div>
 
-        <div className="bg-slate-900/80 p-1 rounded-xl">
-          <div className="text-[8px] text-amber-400 uppercase font-semibold">Derash</div>
-          <div className="text-xs font-black text-amber-400">{derash}</div>
+        <div className="bg-slate-900/80 p-1 rounded-xl flex flex-col items-center justify-center">
+          <div className="text-[8px] text-amber-400 font-bold uppercase tracking-wide">ደራሽ</div>
+          <div className="text-xs font-black text-amber-300 whitespace-nowrap">{derash} ETB</div>
         </div>
 
         <div className="bg-slate-900/80 p-1 rounded-xl">
@@ -374,11 +402,11 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
         </div>
       </div>
 
-      {/* Main Board Layout */}
+      {/* Main Board Layout (Side-by-side 2 columns: Left 75-Ball Board, Right Live Ball Caller & Vertical Cartels) */}
       <div className="grid grid-cols-12 gap-2 flex-1">
-        {/* Left: 75-Ball Board */}
-        <div className="col-span-6 bg-[#181d30] border border-slate-800 rounded-2xl p-2 flex flex-col justify-between">
-          <div className="grid grid-cols-5 gap-0.5 text-center font-black text-xs mb-1">
+        {/* Left Column: 75-Ball Board (Full 1-75 display - bold & prominent numbers) */}
+        <div className="col-span-6 bg-[#181d30] border border-slate-800 rounded-2xl p-2 flex flex-col justify-between shadow-lg">
+          <div className="grid grid-cols-5 gap-0.5 text-center font-black text-[11px] mb-1.5 pb-1 border-b border-slate-800">
             <span className="text-blue-400">B</span>
             <span className="text-indigo-400">I</span>
             <span className="text-fuchsia-400">N</span>
@@ -386,7 +414,7 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
             <span className="text-orange-400">O</span>
           </div>
 
-          <div className="grid grid-cols-5 gap-1 text-[10px] font-bold text-center flex-1">
+          <div className="grid grid-cols-5 gap-0.5 text-center flex-1">
             {Array.from({ length: 15 }).map((_, r) => (
               <React.Fragment key={r}>
                 {[0, 1, 2, 3, 4].map((c) => {
@@ -398,13 +426,13 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
                     <div
                       key={num}
                       className={`
-                        py-1 rounded flex items-center justify-center font-semibold transition-all
+                        py-1 rounded flex items-center justify-center font-black text-[10px] transition-all border
                         ${
                           isLatest
-                            ? 'bg-amber-400 text-slate-950 font-black animate-pulse shadow-md'
+                            ? 'bg-amber-400 text-slate-950 font-black border-amber-300 animate-pulse shadow-md scale-105 z-10'
                             : isCalled
-                            ? 'bg-emerald-500/30 text-emerald-300 font-bold border border-emerald-500/50'
-                            : 'bg-slate-800/60 text-slate-400'
+                            ? 'bg-emerald-500/40 text-emerald-200 font-black border-emerald-400/60 shadow-sm'
+                            : 'bg-slate-900/90 text-slate-100 font-extrabold border-slate-700/80'
                         }
                       `}
                     >
@@ -417,24 +445,34 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
           </div>
         </div>
 
-        {/* Right: Ball Caller + Selected Cartels */}
-        <div className="col-span-6 flex flex-col gap-2 max-h-[520px] overflow-y-auto pr-0.5">
-          {/* Live Ball Caller */}
-          <div className="bg-[#181d30] border border-slate-800 rounded-2xl p-2 flex flex-col items-center justify-between shrink-0">
+        {/* Right Column: Live Ball Caller (TOP) + Vertical Scroll Cartels (BOTTOM) */}
+        <div className="col-span-6 flex flex-col gap-2 max-h-[520px] overflow-hidden">
+          {/* Live Ball Caller ("kuter miwetabete") - TOP */}
+          <div className="bg-[#181d30] border border-slate-800 rounded-2xl p-2 flex flex-col items-center justify-between shadow-md shrink-0">
             <div className="w-full flex items-center justify-between px-1">
-              <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider">
+              <span className="text-[9px] font-black text-amber-400 uppercase tracking-wider">
                 {currentBall ? currentBall.formatted : 'CALLING...'}
               </span>
-              <button
-                onClick={() => setSoundEnabled(!soundEnabled)}
-                className="text-slate-400 hover:text-white p-0.5 cursor-pointer"
-              >
-                {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-amber-400" /> : <VolumeX className="w-3.5 h-3.5" />}
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setIsSoundModalOpen(true)}
+                  title="የድምፅ ማስተካከያ (Sound Files)"
+                  className="text-slate-400 hover:text-amber-400 p-0.5 cursor-pointer transition-colors"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => setSoundEnabled(!soundEnabled)}
+                  title={soundEnabled ? 'ድምፅ አጥፋ' : 'ድምፅ ክፈት'}
+                  className="text-slate-400 hover:text-white p-0.5 cursor-pointer"
+                >
+                  {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-amber-400" /> : <VolumeX className="w-3.5 h-3.5" />}
+                </button>
+              </div>
             </div>
 
-            {/* Ball Circle */}
-            <div className="w-14 h-14 my-1 rounded-full bg-gradient-to-tr from-amber-400 via-orange-400 to-amber-500 p-0.5 shadow-lg flex items-center justify-center">
+            {/* Main Ball Circle */}
+            <div className="w-13 h-13 my-1 rounded-full bg-gradient-to-tr from-amber-400 via-orange-400 to-amber-500 p-0.5 shadow-lg flex items-center justify-center">
               <div className="w-full h-full bg-slate-950 rounded-full flex flex-col items-center justify-center">
                 <span className="text-sm font-black text-amber-400 leading-none">
                   {currentBall ? currentBall.formatted : '--'}
@@ -442,43 +480,71 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
               </div>
             </div>
 
+            {/* Last Called Balls Row */}
+            <div className="w-full flex items-center justify-center gap-0.5 overflow-x-auto py-0.5 max-w-full scrollbar-none">
+              {calledBalls.slice(-4).reverse().map((b, idx) => (
+                <span
+                  key={idx}
+                  className={`text-[8px] font-bold px-1 py-0.2 rounded border shrink-0 ${
+                    idx === 0
+                      ? 'bg-amber-400 text-slate-950 font-black border-amber-300'
+                      : 'bg-slate-800 text-slate-400 border-slate-700'
+                  }`}
+                >
+                  {b.formatted}
+                </span>
+              ))}
+            </div>
+
             {/* Auto Switch */}
-            <div className="w-full flex items-center justify-between pt-1 border-t border-slate-800/80 px-1">
-              <span className="text-[9px] font-bold text-slate-400">AUTOMATIC</span>
+            <div className="w-full flex items-center justify-between pt-1 border-t border-slate-800/80 px-1 mt-1">
+              <span className="text-[8px] font-bold text-slate-400 uppercase">AUTO DAUB</span>
               <input
                 type="checkbox"
                 checked={isAutomatic}
                 onChange={(e) => setIsAutomatic(e.target.checked)}
-                className="accent-emerald-500 cursor-pointer w-4 h-4"
+                className="accent-emerald-500 cursor-pointer w-3.5 h-3.5"
               />
             </div>
           </div>
 
-          {/* Spectator Card when no tickets are selected */}
-          {activeCartels.length === 0 && (
-            <div className="bg-[#181d30] border border-slate-800 rounded-2xl p-4 text-center space-y-1.5 shadow-md shrink-0">
-              <div className="text-xs font-bold text-sky-400 flex items-center justify-center gap-1.5">
+          {/* Vertical Scrolling Cartels Section (BOTTOM) */}
+          {activeCartels.length === 0 ? (
+            <div className="bg-[#181d30] border border-slate-800 rounded-2xl p-2.5 text-center space-y-1 shadow-md">
+              <div className="text-[10px] font-bold text-sky-400 flex items-center justify-center gap-1">
                 <span>👀</span>
-                <span>ተመልካች (Spectator Mode)</span>
+                <span>ተመልካች Mode</span>
               </div>
-              <p className="text-[11px] text-slate-400">
-                ካርቴላ አልመረጡም። የወጡትን ቁጥሮችና የጨዋታውን ሂደት በቀጥታ መከታተል ይችላሉ!
+              <p className="text-[9px] text-slate-400 leading-tight">
+                የወጡትን ቁጥሮችና የጨዋታውን ሂደት በቀጥታ መከታተል ይችላሉ!
               </p>
             </div>
-          )}
+          ) : (
+            <div className="flex flex-col gap-1 w-full bg-[#181d30] border border-slate-800 rounded-2xl p-2 shadow-md flex-1 overflow-hidden">
+              <div className="flex items-center justify-between text-[9px] font-bold text-amber-400 px-1">
+                <span>ካርቴላዎች ({activeCartels.length}):</span>
+                {activeCartels.length > 1 && (
+                  <span className="text-slate-400 text-[8px] animate-pulse">ወደላይ/ወደታች ↕</span>
+                )}
+              </div>
 
-          {/* ALL Selected Cartels Display (White Cartel Card with colorful B-I-N-G-O header) */}
-          {activeCartels.map((cartel, cartelIdx) => (
-            <CartelCard
-              key={cartel.id || cartelIdx}
-              cartel={cartel}
-              cartelIndex={cartelIdx}
-              calledSet={calledSet}
-              headerColors={headerColors}
-              onCellClick={handleCellClick}
-              isSpectator={isSpectator}
-            />
-          ))}
+              {/* Vertical Scroll Container for Cartels */}
+              <div className="flex flex-col gap-2 overflow-y-auto max-h-[300px] py-0.5 px-0.5 scrollbar-thin scrollbar-thumb-amber-500/50 w-full">
+                {activeCartels.map((cartel, cartelIdx) => (
+                  <div key={cartel.id || cartelIdx} className="w-full flex justify-center">
+                    <CartelCard
+                      cartel={cartel}
+                      cartelIndex={cartelIdx}
+                      calledSet={calledSet}
+                      headerColors={headerColors}
+                      onCellClick={handleCellClick}
+                      isSpectator={isSpectator}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -602,6 +668,12 @@ export const PageLiveGame: React.FC<PageLiveGameProps> = ({
           </div>
         </div>
       )}
+
+      {/* Sound Files & Audio Settings Modal */}
+      <SoundSettingsModal
+        isOpen={isSoundModalOpen}
+        onClose={() => setIsSoundModalOpen(false)}
+      />
     </div>
   );
 };
