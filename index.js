@@ -1,371 +1,76 @@
 import 'dotenv/config';
-
-// Automatically align database to bingo_db if luckybingo is specified
-if (process.env.MONGODB_URI && process.env.MONGODB_URI.includes('/luckybingo')) {
-  process.env.MONGODB_URI = process.env.MONGODB_URI.replace('/luckybingo', '/bingo_db');
-}
-
 import express from 'express';
-import mongoose from 'mongoose';
 import { createServer } from 'node:http';
-import { Server as SocketIOServer } from 'socket.io';
-import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer } from 'vite';
-import { setupBingoSocket } from './src/bingoSocket.js';
-import {
-  connectMongoDB,
-  getUsersList,
-  findOrCreateUser,
-  updateUserBalance,
-  getDbStatus,
-  getUserProfile,
-  saveTransaction,
-  getPlayerTransactions,
-  savePlayerHistory,
-  getPlayerHistory,
-  getMongoDBLeaderboard,
-  getAllUsersForAdmin,
-  adminUpdateUser,
-  adminGetTransactions,
-  adminUpdateTransaction
-} from './src/db/mongodb.js';
+import { Telegraf, Markup } from 'telegraf';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
 const app = express();
-
-// Connect MongoDB on start
-connectMongoDB().catch((err) => console.error('MongoDB init error:', err));
-
 const httpServer = createServer(app);
-const io = new SocketIOServer(httpServer, {
-  cors: {
-    origin: '*',
-  },
-  pingTimeout: 30000,
-  pingInterval: 10000,
-});
-
-setupBingoSocket(io);
-
-const host = '0.0.0.0';
 const port = 3000;
+const host = '0.0.0.0';
 
 app.use(express.json());
 
+// API Health route
 app.get('/api/health', (_req, res) => {
-  res.status(200).json({ status: 'ok', port, db: getDbStatus() });
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.get('/api/db-status', (_req, res) => {
-  res.json({ success: true, ...getDbStatus() });
-});
-
-app.get('/api/db-debug-info', async (_req, res) => {
-  let mongoUri = process.env.MONGODB_URI || 'mongodb+srv://admin:hVI9tTaroIlS7fJ1@cluster0.viwaesg.mongodb.net/bingo_db?retryWrites=true&w=majority&appName=Cluster0';
-  let redactedUri = mongoUri;
+// Telegram Bot Setup (if token provided)
+const botToken = process.env.TELEGRAM_BOT_TOKEN;
+if (botToken) {
   try {
-    const urlObj = new URL(mongoUri.startsWith('mongodb') ? mongoUri : 'mongodb://' + mongoUri);
-    if (urlObj.password) {
-      urlObj.password = '****';
-    }
-    redactedUri = urlObj.toString();
-  } catch(e) {}
+    const bot = new Telegraf(botToken);
+    const webAppUrl = process.env.TELEGRAM_WEBAPP_URL || 'https://ais-dev-nbckxdtg7wgpid6olrsnxi-274471626952.europe-west1.run.app';
 
-  let testError = null;
-  let testSuccess = false;
-  try {
-    const conn = await mongoose.createConnection(mongoUri, {
-      connectTimeoutMS: 5000,
-      serverSelectionTimeoutMS: 5000,
-    }).asPromise();
-    testSuccess = true;
-    await conn.close();
+    bot.start((ctx) => {
+      ctx.reply(
+        '👋 እንኳን ወደ Lucky Bingo Bot በደህና መጡ! \n\nታች ያለውን "Play Bingo 🎮" ቁልፍ በመጫን ጨዋታውን ይጀምሩ።',
+        Markup.inlineKeyboard([
+          [Markup.button.webApp('Play Bingo 🎮', webAppUrl)]
+        ])
+      );
+    });
+
+    bot.launch()
+      .then(() => console.log('🤖 Telegram bot started successfully'))
+      .catch((err) => console.error('Telegram bot launch error:', err.message));
+
+    process.once('SIGINT', () => bot.stop('SIGINT'));
+    process.once('SIGTERM', () => bot.stop('SIGTERM'));
   } catch (err) {
-    testError = err instanceof Error ? err.message : String(err);
+    console.error('Failed to initialize Telegram Bot:', err);
   }
-
-  res.json({
-    envUriSet: !!process.env.MONGODB_URI,
-    redactedUri,
-    readyState: mongoose.connection.readyState,
-    testSuccess,
-    testError,
-  });
-});
-
-app.get('/healthz', (_req, res) => {
-  res.status(200).json({ status: 'ok', port });
-});
-
-app.get('/api/users', async (_req, res) => {
-  try {
-    const users = await getUsersList();
-    res.json({ success: true, users });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Failed to fetch users' });
-  }
-});
-
-app.post('/api/users', async (req, res) => {
-  try {
-    const { telegramId, name, username, phoneNumber, photoUrl } = req.body;
-    if (!telegramId || !name) {
-      return res.status(400).json({ success: false, error: 'telegramId and name are required' });
-    }
-    const user = await findOrCreateUser(telegramId, name, username, phoneNumber, photoUrl);
-    res.json({ success: true, user });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Failed to save user' });
-  }
-});
-
-app.post('/api/users/balance', async (req, res) => {
-  try {
-    const { telegramId, amountChange } = req.body;
-    if (!telegramId || amountChange === undefined) {
-      return res.status(400).json({ success: false, error: 'telegramId and amountChange required' });
-    }
-    const user = await updateUserBalance(telegramId, Number(amountChange));
-    res.json({ success: true, user });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Failed to update user balance' });
-  }
-});
-
-// GET user profile stats and balance
-app.get('/api/users/:telegramId', async (req, res) => {
-  try {
-    const { telegramId } = req.params;
-    const user = await getUserProfile(telegramId);
-    if (!user) {
-      return res.status(404).json({ success: false, error: 'User not found' });
-    }
-    res.json({ success: true, user });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Failed to fetch user profile' });
-  }
-});
-
-// GET leaderboard (Scores)
-app.get('/api/leaderboard', async (req, res) => {
-  try {
-    const period = req.query.period || 'alltime';
-    const leaderboard = await getMongoDBLeaderboard(period);
-    res.json({ success: true, leaderboard });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Failed to fetch leaderboard' });
-  }
-});
-
-// GET transaction history for a player
-app.get('/api/transactions/:playerId', async (req, res) => {
-  try {
-    const { playerId } = req.params;
-    const transactions = await getPlayerTransactions(playerId);
-    res.json({ success: true, transactions });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Failed to fetch transactions' });
-  }
-});
-
-// POST save a transaction
-app.post('/api/transactions', async (req, res) => {
-  try {
-    const tx = req.body;
-    if (!tx || !tx.id || !tx.playerId) {
-      return res.status(400).json({ success: false, error: 'Invalid transaction data' });
-    }
-    const saved = await saveTransaction(tx);
-    res.json({ success: true, transaction: saved });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Failed to save transaction' });
-  }
-});
-
-// Admin portal API routes
-app.get('/api/admin/users', async (_req, res) => {
-  try {
-    const users = await getAllUsersForAdmin();
-    res.json({ success: true, users });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Failed to fetch admin users' });
-  }
-});
-
-app.post('/api/admin/users/update', async (req, res) => {
-  try {
-    const { telegramId, isBanned, balance } = req.body;
-    const updateData = {};
-    if (isBanned !== undefined) updateData.isBanned = isBanned;
-    if (balance !== undefined) updateData.balance = Number(balance);
-
-    const updated = await adminUpdateUser(telegramId, updateData);
-    if (!updated) {
-      return res.status(404).json({ success: false, error: 'User not found' });
-    }
-    res.json({ success: true, user: updated });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Failed to update user' });
-  }
-});
-
-app.get('/api/admin/transactions', async (_req, res) => {
-  try {
-    const transactions = await adminGetTransactions();
-    res.json({ success: true, transactions });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Failed to fetch admin transactions' });
-  }
-});
-
-app.post('/api/admin/transactions/update', async (req, res) => {
-  try {
-    const { id, status } = req.body;
-    if (!id || !status) {
-      return res.status(400).json({ success: false, error: 'Transaction id and status required' });
-    }
-
-    const txs = await adminGetTransactions();
-    const tx = txs.find((t) => t.id === id);
-    if (!tx) {
-      return res.status(404).json({ success: false, error: 'Transaction not found' });
-    }
-
-    if (tx.status !== 'pending') {
-      return res.status(400).json({ success: false, error: 'Transaction already processed' });
-    }
-
-    const updatedTx = await adminUpdateTransaction(id, status);
-
-    // If approved deposit, add funds to player's balance
-    if (status === 'completed' && tx.type === 'deposit') {
-      await updateUserBalance(tx.playerId, Number(tx.amount));
-    }
-
-    // If rejected withdrawal, refund the funds back to user's balance
-    if (status === 'rejected' && tx.type === 'withdrawal') {
-      await updateUserBalance(tx.playerId, Math.abs(Number(tx.amount)));
-    }
-
-    res.json({ success: true, transaction: updatedTx });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Failed to update transaction status' });
-  }
-});
-
-// GET match history for a player
-app.get('/api/history/:playerId', async (req, res) => {
-  try {
-    const { playerId } = req.params;
-    const history = await getPlayerHistory(playerId);
-    res.json({ success: true, history });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Failed to fetch game history' });
-  }
-});
-
-// POST save a match history entry
-app.post('/api/history', async (req, res) => {
-  try {
-    const entry = req.body;
-    if (!entry || !entry.id || !entry.playerId) {
-      return res.status(400).json({ success: false, error: 'Invalid history data' });
-    }
-    const saved = await savePlayerHistory(entry);
-    res.json({ success: true, history: saved });
-  } catch (err) {
-    res.status(500).json({ success: false, error: 'Failed to save history entry' });
-  }
-});
-
-// Configure Vite middleware in development mode
-if (process.env.NODE_ENV !== 'production') {
-  const vite = await createViteServer({
-    server: { middlewareMode: true },
-    appType: 'spa',
-  });
-  app.use(vite.middlewares);
 } else {
-  const frontendDir = path.join(process.cwd(), 'dist');
-  app.use(express.static(frontendDir));
-
-  app.get('/', (req, res) => {
-    const indexPath = path.join(frontendDir, 'index.html');
-    if (fs.existsSync(indexPath)) {
-      return res.sendFile(indexPath);
-    }
-    return res.status(404).send('Frontend build not found. Please run "npm run build" before starting the server.');
-  });
-
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api/')) {
-      return next();
-    }
-    const indexPath = path.join(frontendDir, 'index.html');
-    if (fs.existsSync(indexPath)) {
-      return res.sendFile(indexPath);
-    }
-    return res.status(404).send('Frontend build not found. Please run "npm run build" before starting the server.');
-  });
+  console.log('💡 TELEGRAM_BOT_TOKEN not provided. Bot polling skipped.');
 }
 
-const startServer = () => {
-  return new Promise((resolve, reject) => {
-    const server = httpServer.listen(port, host, () => {
-      console.log(`HTTP server listening on http://${host}:${port}`);
-      resolve(server);
+// Vite middleware for dev / static for prod
+async function setupViteOrStatic() {
+  if (process.env.NODE_ENV !== 'production') {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
     });
-
-    server.on('error', (error) => {
-      reject(error);
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (_req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
     });
-  });
-};
-
-const startBot = async () => {
-  try {
-    const botModule = await import('./src/bot.js');
-    const startTelegramBot = botModule.startBot;
-    const bot = botModule.bot;
-
-    const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
-    const webhookPath = process.env.TELEGRAM_WEBHOOK_PATH;
-
-    if (webhookUrl && webhookPath && bot) {
-      const fullWebhook = `${webhookUrl.replace(/\/+$/, '')}${webhookPath}`;
-      try {
-        await bot.telegram.setWebhook(fullWebhook, { drop_pending_updates: true });
-        app.use(webhookPath, express.json(), bot.webhookCallback(webhookPath));
-        console.log('Telegram webhook configured at', webhookPath);
-      } catch (err) {
-        console.error('Failed to set Telegram webhook:', err);
-      }
-    } else if (bot) {
-      await startTelegramBot();
-      console.log('Telegram bot started in polling mode');
-    }
-  } catch (error) {
-    console.error('Failed to start Telegram bot:', error);
   }
-};
+}
 
-const shutdown = (signal) => {
-  console.log(`Received ${signal}, shutting down...`);
-  process.exit(0);
-};
-
-process.once('SIGINT', () => shutdown('SIGINT'));
-process.once('SIGTERM', () => shutdown('SIGTERM'));
-
-const main = async () => {
-  await startServer();
-  await startBot();
-};
-
-main().catch((error) => {
-  console.error('Failed to start application:', error);
-  process.exit(1);
+setupViteOrStatic().then(() => {
+  httpServer.listen(port, host, () => {
+    console.log(`🚀 Server running on http://${host}:${port}`);
+  });
+}).catch((err) => {
+  console.error('Failed to start server:', err);
 });
